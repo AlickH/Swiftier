@@ -1,6 +1,6 @@
 //
 //  main.swift
-//  EasyTierHelper
+//  SwiftierHelper
 //
 //  Created by A. Lick on 2026-01-15 22:14.
 //
@@ -230,7 +230,7 @@ class HelperDelegate: NSObject, NSXPCListenerDelegate, HelperProtocol {
 
 // MARK: - Main Entry Point
 
-log("=== EasyTier Helper Starting ===")
+log("=== Swiftier Helper Starting ===")
 log("Version: \(kHelperVersion)")
 log("Running as UID: \(getuid())")
 

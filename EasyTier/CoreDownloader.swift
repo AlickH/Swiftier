@@ -26,10 +26,9 @@ final class CoreDownloader: ObservableObject {
     private let repoOwner = "EasyTier"
     private let repoName = "EasyTier"
     
-    // Application Support/EasyTier/bin
     var installDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("EasyTier/bin")
+        return appSupport.appendingPathComponent("Swiftier/bin")
     }
     
     var corePath: String {

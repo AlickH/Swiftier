@@ -13,7 +13,7 @@ struct PortForwardRule: Identifiable, Equatable {
 }
 
 struct EasyTierConfigModel {
-    var instanceName: String = Host.current().localizedName ?? "easytier-node"
+    var instanceName: String = Host.current().localizedName ?? "swiftier-node"
     var instanceId: String = UUID().uuidString.lowercased()
     
     mutating func regenerateInstanceId() {

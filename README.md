@@ -1,6 +1,4 @@
-# Swiftier 
-## Unofficial Native SwiftUI macOS client for easytier-core
-## 非官方原生SwiftUI easytier-core macOS客户端
+# Swiftier (EasyTier for macOS)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/AlickH/Swiftier/main/EasyTier/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png" width="128" height="128" alt="Swiftier Icon">
@@ -39,6 +37,12 @@
 3.  Select your Development Team in the "Signing & Capabilities" tab.
 4.  Build and Run (`Cmd + R`).
 
+### Contact & Developer
+
+*   **Developer**: Alick Huang
+*   **Email**: [minamike2007@gmail.com](mailto:minamike2007@gmail.com)
+*   **GitHub**: [AlickH/Swiftier](https://github.com/AlickH/Swiftier)
+
 ### License
 
 Distributed under the **MIT License**.
@@ -73,6 +77,12 @@ Distributed under the **MIT License**.
 2.  使用 Xcode 打开 `Swiftier.xcodeproj`。
 3.  在 Project 设置的 `Signing & Capabilities` 中选择您的 Apple Developer 账号并配置签名。
 4.  运行项目 (`Cmd + R`)。
+
+### 联系与开发者
+
+*   **开发者**: Alick Huang
+*   **电子邮箱**: [minamike2007@gmail.com](mailto:minamike2007@gmail.com)
+*   **GitHub**: [AlickH/Swiftier](https://github.com/AlickH/Swiftier)
 
 ### 开源协议
 

@@ -6,12 +6,15 @@ struct ContentView: View {
     @StateObject private var runner = EasyTierRunner.shared
     @StateObject private var configManager = ConfigManager.shared
     @StateObject private var downloader = CoreDownloader.shared
+    @StateObject private var permissionManager = PermissionManager.shared
+    
     @State private var selectedConfig: URL?
     @State private var showLogView = false
     @State private var showSettingsView = false
     @State private var showConfigGenerator = false
     @State private var editingConfigURL: URL?
     @State private var showCreatePrompt = false
+    @State private var showFDAOverlay = false
     @State private var newConfigName = ""
     
     private let windowWidth: CGFloat = 420
@@ -115,6 +118,12 @@ struct ContentView: View {
                     .zIndex(999)
                     .transition(.opacity)
             }
+            
+            // FDA Permission Guide
+            if showFDAOverlay && !permissionManager.isFDAGranted {
+                FDAGuideView(isPresented: $showFDAOverlay)
+                    .zIndex(1000)
+            }
         }
         .onChange(of: configManager.configFiles) { newFiles in
             // 如果列表不为空，且当前没选中的，或者选中的不在新列表里 -> 选第一个
@@ -128,6 +137,12 @@ struct ContentView: View {
         }
         // 移除了 onChange(of: selectedConfig) 的自动连接逻辑
         .onAppear {
+            // 检查权限
+            permissionManager.checkFullDiskAccess()
+            if !permissionManager.isFDAGranted {
+                showFDAOverlay = true
+            }
+            
             // 初始启动时刷新一次列表
             configManager.refreshConfigs()
             
@@ -526,7 +541,7 @@ struct DownloadingView: View {
                     VStack(spacing: 12) {
                         Text("缺少内核组件")
                             .font(.title2.bold())
-                        Text("EasyTier 需要核心二进制文件才能运行。\n点击下方按钮自动从 GitHub 下载并安装。")
+                        Text("Swiftier 需要核心二进制文件才能运行。\n请选择下载方式从 GitHub 获取并安装。")
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
                         
@@ -536,19 +551,26 @@ struct DownloadingView: View {
                                 .font(.caption)
                         }
                         
-                        Button("立即安装") {
-                            Task {
-                                do {
-                                    errorText = nil
-                                    try await downloader.installCore()
-                                    downloader.objectWillChange.send() 
-                                } catch {
-                                    errorText = error.localizedDescription
-                                }
+                        VStack(spacing: 10) {
+                            Button("GitHub 加速安装 (推荐)") {
+                                installCore(useProxy: true)
                             }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            
+                            Button("GitHub 直连安装") {
+                                installCore(useProxy: false)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        
+                        Button("退出 Swiftier") {
+                            NSApplication.shared.terminate(nil)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
                     }
                 }
             }
@@ -558,5 +580,93 @@ struct DownloadingView: View {
             .frame(width: 380)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private func installCore(useProxy: Bool) {
+        Task {
+            do {
+                errorText = nil
+                try await downloader.installCore(useProxy: useProxy)
+                downloader.objectWillChange.send()
+            } catch {
+                errorText = error.localizedDescription
+            }
+        }
+    }
+}
+
+struct FDAGuideView: View {
+    @Binding var isPresented: Bool
+    @ObservedObject var permissionManager = PermissionManager.shared
+    
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            
+            VStack(spacing: 24) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.orange)
+                
+                VStack(spacing: 12) {
+                    Text("需要完全磁盘访问权限")
+                        .font(.title2.bold())
+                    
+                    Text("为了能够读取您选择的任意文件夹及配置文件，Swiftier 需要“完全磁盘访问权限”。\n这不会泄露您的私有数据，仅用于解除系统文件夹读取限制。")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        guideStep(number: "1", text: "点击“去开启”，进入系统设置")
+                        guideStep(number: "2", text: "Swiftier 应该已自动出现在列表中")
+                        guideStep(number: "3", text: "只需打开旁边的开关即可")
+                    }
+                    .padding(.vertical)
+                    
+                    VStack(spacing: 12) {
+                        HStack(spacing: 15) {
+                            Button("在 Finder 中显示") {
+                                permissionManager.revealAppInFinder()
+                            }
+                            .buttonStyle(.bordered)
+                            
+                            Button("立即去开启") {
+                                permissionManager.openFullDiskAccessSettings()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        
+                        Button("以后再说") {
+                            withAnimation { isPresented = false }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(30)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color(nsColor: .windowBackgroundColor)))
+            .shadow(radius: 20)
+            .frame(width: 380)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // 当用户从系统设置返回时，自动重新检查
+            permissionManager.checkFullDiskAccess()
+        }
+    }
+    
+    private func guideStep(number: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(number)
+                .font(.caption.bold())
+                .foregroundColor(.white)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(Color.orange))
+            
+            Text(text)
+                .font(.subheadline)
+        }
     }
 }

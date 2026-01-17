@@ -58,9 +58,17 @@ class ConfigManager: ObservableObject {
             return
         }
         
-        let targetDir = drive.appendingPathComponent("EasyTier")
+        let targetDir = drive.appendingPathComponent("Swiftier")
+        let oldDir = drive.appendingPathComponent("EasyTier")
         
         do {
+            // 0. 自动迁移旧 EasyTier 文件夹（如果存在且新 Swiftier 不存在）
+            if FileManager.default.fileExists(atPath: oldDir.path) && 
+               !FileManager.default.fileExists(atPath: targetDir.path) {
+                try FileManager.default.moveItem(at: oldDir, to: targetDir)
+                print("已将旧 EasyTier 文件夹迁移到 Swiftier")
+            }
+            
             // 1. 创建目标目录
             if !FileManager.default.fileExists(atPath: targetDir.path) {
                 try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)

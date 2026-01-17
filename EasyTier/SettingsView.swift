@@ -13,6 +13,8 @@ struct SettingsView: View {
     @AppStorage("keepRunningOnExit") private var keepRunningOnExit: Bool = false
     @AppStorage("logLevel") private var logLevel: String = "TRACE"
     
+    @ObservedObject private var permissionManager = PermissionManager.shared
+    
     // Kernel Settings
     @ObservedObject private var downloader = CoreDownloader.shared
     @AppStorage("useBetaChannel") private var useBetaChannel = false
@@ -62,7 +64,7 @@ struct SettingsView: View {
                     
                     VStack(alignment: .leading, spacing: 5) {
                         Toggle("退出 APP 时保持连接服务运行", isOn: $keepRunningOnExit)
-                        Text("开启此选项后，退出 APP 将不会断开 EasyTier 连接，后台服务将继续运行。")
+                        Text("开启此选项后，退出 APP 将不会断开 Swiftier 连接，后台服务将继续运行。")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -71,10 +73,30 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Toggle("退出 APP 时停止后台服务", isOn: $quitHelperOnExit)
                         
-                        Text("开启此选项后，APP 退出时将同时终止 EasyTierHelper 守护进程。关闭此选项仅保留 Helper 进程以加速下次启动，但 EasyTier 连接仍会断开。")
+                        Text("开启此选项后，APP 退出时将同时终止 SwiftierHelper 守护进程。关闭此选项仅保留 Helper 进程以加速下次启动，但 Swiftier 连接仍会断开。")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true) // 确保文字能自动换行
+                    }
+                }
+                
+                Section("隐私") {
+                    HStack {
+                        Text("完全磁盘访问权限")
+                        Spacer()
+                        if permissionManager.isFDAGranted {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("已开启")
+                                    .foregroundColor(.secondary)
+                            }
+                        } else {
+                            Button("去开启") {
+                                permissionManager.openFullDiskAccessSettings()
+                            }
+                            .foregroundColor(.red)
+                        }
                     }
                 }
                 

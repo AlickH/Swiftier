@@ -139,7 +139,7 @@ final class CoreService {
         
         resetLogState()
         
-        let logPath = "/tmp/easytier-debug.log"
+        let logPath = "/tmp/swiftier-debug.log"
         
         let scriptText = """
         do shell script "pkill -9 easytier-core; \\
@@ -169,7 +169,7 @@ final class CoreService {
     private func getBinaryPath(name: String) -> String? {
         // 1. Check Application Support (Auto-download location)
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-             let customPath = appSupport.appendingPathComponent("EasyTier/bin/\(name)").path
+             let customPath = appSupport.appendingPathComponent("Swiftier/bin/\(name)").path
              if FileManager.default.fileExists(atPath: customPath) {
                  return customPath
              }

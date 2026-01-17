@@ -276,7 +276,7 @@ final class HelperManager {
     private func getCorePath() -> String? {
         // 1. Check Application Support (Auto-download location)
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-             let customPath = appSupport.appendingPathComponent("EasyTier/bin/easytier-core").path
+             let customPath = appSupport.appendingPathComponent("Swiftier/bin/easytier-core").path
              if FileManager.default.fileExists(atPath: customPath) {
                  return customPath
              }
