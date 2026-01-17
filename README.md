@@ -1,5 +1,6 @@
 # Swiftier 
-## (Unofficial Native SwiftUI macOS client for easytier-core / 非官方原生SwiftUI easytier-core macOS客户端)
+## Unofficial Native SwiftUI macOS client for easytier-core
+## 非官方原生SwiftUI easytier-core macOS客户端
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/AlickH/Swiftier/main/EasyTier/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png" width="128" height="128" alt="Swiftier Icon">
