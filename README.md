@@ -1,7 +1,7 @@
 # Swiftier (EasyTier for macOS)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/AlickH/Swiftier/main/EasyTier/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png" width="128" height="128" alt="Swiftier Icon">
+  <img src="https://raw.githubusercontent.com/AlickH/Swiftier/main/Swiftier.png" width="128" height="128" alt="Swiftier Icon">
 </p>
 
 [中文说明](#简介) | [English](#introduction)
