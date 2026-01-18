@@ -1,0 +1,795 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E025243B2F1BDA8500F5065A /* SwiftierHelper in Copy Helper Executable */ = {isa = PBXBuildFile; fileRef = E0AC7EE12F192DD600FC425C /* SwiftierHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		E0AC7EEE2F19307C00FC425C /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E0933DDA2F16A26200C7DE59 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E0933DC42F16A25B00C7DE59 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E0933DCB2F16A25B00C7DE59;
+			remoteInfo = EasyTier;
+		};
+		E0933DE42F16A26200C7DE59 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E0933DC42F16A25B00C7DE59 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E0933DCB2F16A25B00C7DE59;
+			remoteInfo = EasyTier;
+		};
+		E0AC7EF52F1933C600FC425C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E0933DC42F16A25B00C7DE59 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E0AC7EE02F192DD600FC425C;
+			remoteInfo = EasyTierHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E0933E002F16A42100C7DE59 /* Copy Helper Executable */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				E025243B2F1BDA8500F5065A /* SwiftierHelper in Copy Helper Executable */,
+			);
+			name = "Copy Helper Executable";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0AC7ED12F19208200FC425C /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0AC7EDF2F192DD600FC425C /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		E0933DCC2F16A25B00C7DE59 /* Swiftier.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swiftier.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0933DD92F16A26200C7DE59 /* SwiftierTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftierTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0933DE32F16A26200C7DE59 /* SwiftierUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftierUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0AC7EE12F192DD600FC425C /* SwiftierHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SwiftierHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E0DA09B32F17A75300C54228 /* Exceptions for "EasyTier" folder in "Swiftier" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E0933DCB2F16A25B00C7DE59 /* Swiftier */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		E025243D2F1BDABB00F5065A /* Exceptions for "EasyTier" folder in "Copy Files" phase from "Swiftier" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				com.alick.swiftier.helper.plist = (CodeSignOnCopy, );
+			};
+			buildPhase = E0AC7ED12F19208200FC425C /* CopyFiles */;
+			membershipExceptions = (
+				com.alick.swiftier.helper.plist,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		E0933DCE2F16A25B00C7DE59 /* EasyTier */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E0DA09B32F17A75300C54228 /* Exceptions for "EasyTier" folder in "Swiftier" target */,
+				E025243D2F1BDABB00F5065A /* Exceptions for "EasyTier" folder in "Copy Files" phase from "Swiftier" target */,
+			);
+			path = EasyTier;
+			sourceTree = "<group>";
+		};
+		E0933DDC2F16A26200C7DE59 /* EasyTierTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EasyTierTests;
+			sourceTree = "<group>";
+		};
+		E0933DE62F16A26200C7DE59 /* EasyTierUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EasyTierUITests;
+			sourceTree = "<group>";
+		};
+		E0AC7EA42F18E97F00FC425C /* EasyTierHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EasyTierHelper;
+			sourceTree = "<group>";
+		};
+		E0AC7EB22F18E98100FC425C /* EasyTierHelperTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EasyTierHelperTests;
+			sourceTree = "<group>";
+		};
+		E0AC7EBC2F18E98100FC425C /* EasyTierHelperUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EasyTierHelperUITests;
+			sourceTree = "<group>";
+		};
+		E0AC7EE22F192DD600FC425C /* EasyTierHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EasyTierHelper;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E0933DC92F16A25B00C7DE59 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E0AC7EEE2F19307C00FC425C /* ServiceManagement.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0933DD62F16A26200C7DE59 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0933DE02F16A26200C7DE59 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0AC7EDE2F192DD600FC425C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E0933DC32F16A25B00C7DE59 = {
+			isa = PBXGroup;
+			children = (
+				E0933DCE2F16A25B00C7DE59 /* EasyTier */,
+				E0933DDC2F16A26200C7DE59 /* EasyTierTests */,
+				E0933DE62F16A26200C7DE59 /* EasyTierUITests */,
+				E0AC7EA42F18E97F00FC425C /* EasyTierHelper */,
+				E0AC7EB22F18E98100FC425C /* EasyTierHelperTests */,
+				E0AC7EBC2F18E98100FC425C /* EasyTierHelperUITests */,
+				E0AC7EE22F192DD600FC425C /* EasyTierHelper */,
+				E0AC7EEC2F19307C00FC425C /* Frameworks */,
+				E0933DCD2F16A25B00C7DE59 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E0933DCD2F16A25B00C7DE59 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E0933DCC2F16A25B00C7DE59 /* Swiftier.app */,
+				E0933DD92F16A26200C7DE59 /* SwiftierTests.xctest */,
+				E0933DE32F16A26200C7DE59 /* SwiftierUITests.xctest */,
+				E0AC7EE12F192DD600FC425C /* SwiftierHelper */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E0AC7EEC2F19307C00FC425C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E0933DCB2F16A25B00C7DE59 /* Swiftier */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0933DED2F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "Swiftier" */;
+			buildPhases = (
+				E0933DC82F16A25B00C7DE59 /* Sources */,
+				E0933DC92F16A25B00C7DE59 /* Frameworks */,
+				E0933DCA2F16A25B00C7DE59 /* Resources */,
+				E0933E002F16A42100C7DE59 /* Copy Helper Executable */,
+				E0AC7ED12F19208200FC425C /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E0AC7EF62F1933C600FC425C /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E0933DCE2F16A25B00C7DE59 /* EasyTier */,
+			);
+			name = Swiftier;
+			packageProductDependencies = (
+			);
+			productName = EasyTier;
+			productReference = E0933DCC2F16A25B00C7DE59 /* Swiftier.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E0933DD82F16A26200C7DE59 /* SwiftierTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0933DF02F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "SwiftierTests" */;
+			buildPhases = (
+				E0933DD52F16A26200C7DE59 /* Sources */,
+				E0933DD62F16A26200C7DE59 /* Frameworks */,
+				E0933DD72F16A26200C7DE59 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E0933DDB2F16A26200C7DE59 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E0933DDC2F16A26200C7DE59 /* EasyTierTests */,
+			);
+			name = SwiftierTests;
+			packageProductDependencies = (
+			);
+			productName = EasyTierTests;
+			productReference = E0933DD92F16A26200C7DE59 /* SwiftierTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E0933DE22F16A26200C7DE59 /* SwiftierUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0933DF32F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "SwiftierUITests" */;
+			buildPhases = (
+				E0933DDF2F16A26200C7DE59 /* Sources */,
+				E0933DE02F16A26200C7DE59 /* Frameworks */,
+				E0933DE12F16A26200C7DE59 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E0933DE52F16A26200C7DE59 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E0933DE62F16A26200C7DE59 /* EasyTierUITests */,
+			);
+			name = SwiftierUITests;
+			packageProductDependencies = (
+			);
+			productName = EasyTierUITests;
+			productReference = E0933DE32F16A26200C7DE59 /* SwiftierUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		E0AC7EE02F192DD600FC425C /* SwiftierHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0AC7EE52F192DD600FC425C /* Build configuration list for PBXNativeTarget "SwiftierHelper" */;
+			buildPhases = (
+				E0AC7EDD2F192DD600FC425C /* Sources */,
+				E0AC7EDE2F192DD600FC425C /* Frameworks */,
+				E0AC7EDF2F192DD600FC425C /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E0AC7EE22F192DD600FC425C /* EasyTierHelper */,
+			);
+			name = SwiftierHelper;
+			packageProductDependencies = (
+			);
+			productName = EasyTierHelper;
+			productReference = E0AC7EE12F192DD600FC425C /* SwiftierHelper */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E0933DC42F16A25B00C7DE59 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					E0933DCB2F16A25B00C7DE59 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					E0933DD82F16A26200C7DE59 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = E0933DCB2F16A25B00C7DE59;
+					};
+					E0933DE22F16A26200C7DE59 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = E0933DCB2F16A25B00C7DE59;
+					};
+					E0AC7EE02F192DD600FC425C = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = E0933DC72F16A25B00C7DE59 /* Build configuration list for PBXProject "Swiftier" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E0933DC32F16A25B00C7DE59;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E0933DCD2F16A25B00C7DE59 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E0933DCB2F16A25B00C7DE59 /* Swiftier */,
+				E0933DD82F16A26200C7DE59 /* SwiftierTests */,
+				E0933DE22F16A26200C7DE59 /* SwiftierUITests */,
+				E0AC7EE02F192DD600FC425C /* SwiftierHelper */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E0933DCA2F16A25B00C7DE59 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0933DD72F16A26200C7DE59 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0933DE12F16A26200C7DE59 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E0933DC82F16A25B00C7DE59 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0933DD52F16A26200C7DE59 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0933DDF2F16A26200C7DE59 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0AC7EDD2F192DD600FC425C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E0933DDB2F16A26200C7DE59 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E0933DCB2F16A25B00C7DE59 /* Swiftier */;
+			targetProxy = E0933DDA2F16A26200C7DE59 /* PBXContainerItemProxy */;
+		};
+		E0933DE52F16A26200C7DE59 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E0933DCB2F16A25B00C7DE59 /* Swiftier */;
+			targetProxy = E0933DE42F16A26200C7DE59 /* PBXContainerItemProxy */;
+		};
+		E0AC7EF62F1933C600FC425C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E0AC7EE02F192DD600FC425C /* SwiftierHelper */;
+			targetProxy = E0AC7EF52F1933C600FC425C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		E0933DEB2F16A26200C7DE59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		E0933DEC2F16A26200C7DE59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		E0933DEE2F16A26200C7DE59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Swiftier;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = EasyTier/EasyTier.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EasyTier/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Swiftier;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E0933DEF2F16A26200C7DE59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Swiftier;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = EasyTier/EasyTier.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EasyTier/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Swiftier;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E0933DF12F16A26200C7DE59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Swiftier.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Swiftier";
+			};
+			name = Debug;
+		};
+		E0933DF22F16A26200C7DE59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Swiftier.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Swiftier";
+			};
+			name = Release;
+		};
+		E0933DF42F16A26200C7DE59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = EasyTier;
+			};
+			name = Debug;
+		};
+		E0933DF52F16A26200C7DE59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = EasyTier;
+			};
+			name = Release;
+		};
+		E0AC7EE62F192DD600FC425C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = EasyTierHelper/EasyTierHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = EasyTierHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E0AC7EE72F192DD600FC425C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = EasyTierHelper/EasyTierHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = J33CVYBKCZ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = EasyTierHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E0933DC72F16A25B00C7DE59 /* Build configuration list for PBXProject "Swiftier" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0933DEB2F16A26200C7DE59 /* Debug */,
+				E0933DEC2F16A26200C7DE59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E0933DED2F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "Swiftier" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0933DEE2F16A26200C7DE59 /* Debug */,
+				E0933DEF2F16A26200C7DE59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E0933DF02F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "SwiftierTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0933DF12F16A26200C7DE59 /* Debug */,
+				E0933DF22F16A26200C7DE59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E0933DF32F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "SwiftierUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0933DF42F16A26200C7DE59 /* Debug */,
+				E0933DF52F16A26200C7DE59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E0AC7EE52F192DD600FC425C /* Build configuration list for PBXNativeTarget "SwiftierHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0AC7EE62F192DD600FC425C /* Debug */,
+				E0AC7EE72F192DD600FC425C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E0933DC42F16A25B00C7DE59 /* Project object */;
+}
