@@ -1,0 +1,55 @@
+name: Build and Release macOS App
+
+on:
+  # 当推送 v* 标签时触发 (e.g. v1.0.0)
+  push:
+    tags:
+      - 'v*'
+  # 允许在 GitHub Actions 页面手动触发
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Package
+    runs-on: macos-14 # 使用最新的 macOS Runner
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build App (Unsigned)
+        # 使用 xcodebuild 编译 Release 版本，强制禁用签名要求
+        run: |
+          xcodebuild build \
+            -scheme Swiftier \
+            -project Swiftier.xcodeproj \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip Application
+        # 进入构建输出目录，将 .app 压缩为 .zip
+        run: |
+          cd build/Build/Products/Release
+          zip -r ../../../../Swiftier-macOS.zip Swiftier.app
+          echo "Build successful, archive created."
+
+      - name: Upload Artifact
+        # 将构建产物上传到 Action 页面，方便手动下载测试
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swiftier-macOS
+          path: Swiftier-macOS.zip
+
+      - name: Create Release
+        # 仅在推送 Tag 时执行发布步骤
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Swiftier-macOS.zip
+          # 使用我们准备好的 RELEASE_NOTE.md 作为发布说明
+          body_path: RELEASE_NOTE.md
+          draft: true # 设为草稿，方便你在发布前最后检查一遍
+          prerelease: false
