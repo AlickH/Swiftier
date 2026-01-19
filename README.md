@@ -29,6 +29,16 @@
 *   📝 **Activity Timeline**: A dual-mode log viewer that separates high-level "Interaction Events" (peer join/leave) from low-level debugging logs.
 *   📦 **Auto Core Management**: Automatically detects, downloads, and manages the correct `easytier-core` binary for your system architecture.
 
+### Troubleshooting
+
+> ⚠️ **"Swiftier is damaged and can't be opened"**
+>
+> Since this app is not notarized by Apple (requires a paid developer account), you may see a warning that the app is damaged. To fix this, run the following command in Terminal:
+> ```bash
+> sudo xattr -cr /Applications/Swiftier.app
+> ```
+> *(Adjust the path if your app is not in the Applications folder)*
+
 ### Requirements
 
 *   macOS 13.0 or later
@@ -73,6 +83,16 @@ Distributed under the **MIT License**.
 *   📊 **实时监控**：直观展示节点列表、P2P 连接状态、延迟和实时流量统计，并配有可视化拓朴指示。
 *   📝 **活动时间轴**：独创的双模式日志视图，通过“交互事件”时间轴清晰展示节点加入、断开等关键动态，同时保留详细的调试日志。
 *   📦 **核心管理**：自动检测系统架构（Intel/Apple Silicon）并自动下载管理 `easytier-core` 内核，真正实现开箱即用。
+
+### 常见问题
+
+> ⚠️ **打开时提示“应用已损坏，无法打开”**
+>
+> 这是 macOS 安全机制对未签名应用的拦截。由于没有付费开发者账号进行公证，您需要在终端运行以下命令来解除限制：
+> ```bash
+> sudo xattr -cr /Applications/Swiftier.app
+> ```
+> *（如果应用不在“应用程序”目录，请修改为实际路径）*
 
 ### 运行环境
 
