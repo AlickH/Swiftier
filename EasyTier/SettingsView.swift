@@ -26,6 +26,14 @@ struct SettingsView: View {
     @State private var showUpdateDetail = false
     @State private var showLicense = false
     
+    // APP Update Check
+    @State private var isCheckingAppUpdate = false
+    @State private var appUpdateStatus: String?
+    @State private var showAppUpdateDetail = false
+    @State private var appVersionInfo: (version: String, body: String, downloadURL: String)?
+    @AppStorage("appAutoUpdate") private var appAutoUpdate: Bool = true
+    @AppStorage("appBetaChannel") private var appBetaChannel: Bool = false
+    
     private let logLevels = ["OFF", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"]
     
     var body: some View {
@@ -44,6 +52,46 @@ struct SettingsView: View {
             // Native Form
             Form {
                 Section("通用") {
+                    // macOS 风格的更新状态卡片
+                    HStack(spacing: 12) {
+                        // 状态图标
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(appUpdateStatus == "有新版本可用" ? Color.orange : Color.green)
+                                .frame(width: 40, height: 40)
+                            Image(systemName: appUpdateStatus == "有新版本可用" ? "arrow.down.circle.fill" : "checkmark")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        // 状态文字
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(appUpdateStatus ?? "Swiftier 已是最新版本")
+                                .font(.headline)
+                            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+                            Text("Swiftier \(version)")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // 检查更新按钮
+                        Button("检查更新") {
+                            checkAppUpdate()
+                        }
+                        .disabled(isCheckingAppUpdate)
+                        .buttonStyle(.bordered)
+                        
+                        if isCheckingAppUpdate {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    
+                    Toggle("自动更新", isOn: $appAutoUpdate)
+                    Toggle("接收 Beta 版本", isOn: $appBetaChannel)
+                    
                     HStack {
                         Text("状态刷新间隔")
                         Spacer()
@@ -149,14 +197,6 @@ struct SettingsView: View {
                 
                 Section("关于") {
                     HStack {
-                        Text("APP 版本")
-                        Spacer()
-                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
-                        Text(version)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
                         Text("开发者")
                         Spacer()
                         Text("Alick Huang")
@@ -231,6 +271,18 @@ struct SettingsView: View {
                     .transition(.move(edge: .trailing)) // Slide from right like a push
                     .zIndex(100)
             }
+            
+            // APP Update Detail Popup
+            if showAppUpdateDetail, let info = appVersionInfo {
+                AppUpdateDetailView(
+                    isPresented: $showAppUpdateDetail,
+                    version: info.version,
+                    releaseNotes: info.body,
+                    downloadURL: info.downloadURL
+                )
+                .transition(.move(edge: .bottom))
+                .zIndex(101)
+            }
         }
         .onAppear {
             checkLaunchAtLogin()
@@ -282,6 +334,77 @@ struct SettingsView: View {
         }
     }
     
+    private func checkAppUpdate() {
+        isCheckingAppUpdate = true
+        appUpdateStatus = "正在检查..."
+        
+        Task {
+            do {
+                // 根据是否接收 Beta 版本选择不同的 API 端点
+                let apiURL = appBetaChannel
+                    ? "https://api.github.com/repos/AlickH/Swiftier/releases"
+                    : "https://api.github.com/repos/AlickH/Swiftier/releases/latest"
+                
+                guard let url = URL(string: apiURL) else {
+                    throw URLError(.badURL)
+                }
+                
+                var request = URLRequest(url: url)
+                request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+                
+                let (data, _) = try await URLSession.shared.data(for: request)
+                
+                var tagName: String?
+                var body: String?
+                var htmlURL: String?
+                
+                if appBetaChannel {
+                    // Beta 模式：获取所有 releases，取第一个（包括 prerelease）
+                    if let releases = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                       let firstRelease = releases.first {
+                        tagName = firstRelease["tag_name"] as? String
+                        body = firstRelease["body"] as? String
+                        htmlURL = firstRelease["html_url"] as? String
+                    }
+                } else {
+                    // 正式版模式：只获取 latest
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        tagName = json["tag_name"] as? String
+                        body = json["body"] as? String
+                        htmlURL = json["html_url"] as? String
+                    }
+                }
+                
+                guard let tag = tagName, let releaseBody = body, let downloadURL = htmlURL else {
+                    throw NSError(domain: "ParseError", code: 0, userInfo: [NSLocalizedDescriptionKey: "无法解析版本信息"])
+                }
+                
+                // 清理版本号（去掉 v 前缀）
+                let remoteVersion = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+                let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+                
+                // 比较版本号
+                if remoteVersion.compare(currentVersion, options: .numeric) == .orderedDescending {
+                    await MainActor.run {
+                        appVersionInfo = (remoteVersion, releaseBody, downloadURL)
+                        showAppUpdateDetail = true
+                        appUpdateStatus = "有新版本可用"
+                    }
+                } else {
+                    await MainActor.run {
+                        appUpdateStatus = nil // 清空状态，显示默认的"已是最新版本"
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    appUpdateStatus = "检查失败"
+                }
+            }
+            
+            await MainActor.run { isCheckingAppUpdate = false }
+        }
+    }
+    
     private func toggleLaunchAtLogin(enabled: Bool) {
         if #available(macOS 13.0, *) {
             do {
@@ -324,6 +447,35 @@ struct UpdateDetailView: View {
             }
             
             // Web Content
+            MarkdownWebView(markdown: releaseNotes)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+struct AppUpdateDetailView: View {
+    @Binding var isPresented: Bool
+    let version: String
+    let releaseNotes: String
+    let downloadURL: String
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            UnifiedHeader(title: "Swiftier \(version) 可用") {
+                Button("稍后") { withAnimation { isPresented = false } }
+                    .buttonStyle(.bordered)
+            } right: {
+                Button("前往下载") {
+                    if let url = URL(string: downloadURL) {
+                        NSWorkspace.shared.open(url)
+                    }
+                    withAnimation { isPresented = false }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            
+            // Release Notes
             MarkdownWebView(markdown: releaseNotes)
         }
         .background(Color(nsColor: .windowBackgroundColor))

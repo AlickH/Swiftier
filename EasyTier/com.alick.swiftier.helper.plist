@@ -6,6 +6,7 @@
     <string>com.alick.swiftier.helper</string>
     
     <!-- 可执行文件路径：使用 EasyTierHelper 作为产品名 -->
+    <!-- 可执行文件路径：相对于 App Bundle 根目录 -->
     <key>BundleProgram</key>
     <string>Contents/MacOS/SwiftierHelper</string>
     

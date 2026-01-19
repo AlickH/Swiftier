@@ -12,7 +12,7 @@ struct PortForwardRule: Identifiable, Equatable {
     var targetPort: String = ""
 }
 
-struct EasyTierConfigModel {
+struct EasyTierConfigModel: Equatable {
     var instanceName: String = Host.current().localizedName ?? "swiftier-node"
     var instanceId: String = UUID().uuidString.lowercased()
     
@@ -62,6 +62,7 @@ struct EasyTierConfigModel {
     var relayAllPeerRpc: Bool = false
     var disableEntryNode: Bool = false // 禁用入口节点
     var enableSocks5: Bool = false // SOCKS5
+    var socks5Port: Int = 1080
     var foreignNetworkWhitelist: String = "" // 网络白名单? Toggle only for now
     
     // MARK: - Advanced Features (Missing from previous version)
@@ -136,6 +137,43 @@ enum PeerMode: String, CaseIterable, Identifiable {
     case standalone = "独立"
     var id: String { rawValue }
 }
+// MARK: - Draft Manager
+class ConfigDraftManager {
+    static let shared = ConfigDraftManager()
+    
+    // Support multiple drafts for different files
+    // Key nil represents "New Config" draft
+    private var drafts: [URL?: EasyTierConfigModel] = [:]
+    
+    func getDraft(for url: URL?) -> EasyTierConfigModel? {
+        return drafts[url]
+    }
+    
+    func saveDraft(for url: URL?, model: EasyTierConfigModel) {
+        drafts[url] = model
+    }
+    
+    func clearDraft(for url: URL? = nil) {
+        // If specific URL provided, clear that. 
+        // NOTE: Our previous usage was clearDraft() implying current.
+        // We should update call sites to pass URL or handle "current" context if needed.
+        // But wait, clearDraft is called after save. We know the URL there.
+        // So we should change the signature to require URL or context.
+        // However, to keep it simple and compatible with the single-draft thought process:
+        // Actually, let's just make it clear specific draft.
+        if let url = url {
+            drafts.removeValue(forKey: url)
+        } else {
+             // If nil passed, clear "New Config" draft (key nil)
+             drafts.removeValue(forKey: nil)
+        }
+    }
+    
+    // Helper to clear all if needed (optional)
+    func clearAll() {
+        drafts.removeAll()
+    }
+}
 
 enum ConfigScreen {
     case main
@@ -149,6 +187,10 @@ struct ConfigGeneratorView: View {
     var onSave: () -> Void
     
     @State private var model = EasyTierConfigModel()
+    
+    // Track if we've already loaded to avoid resetting user edits
+    @State private var hasLoadedInitially = false
+    @State private var lastLoadedURL: URL? = nil
     
     // Alerts
     @State private var saveMessage: String?
@@ -178,10 +220,56 @@ struct ConfigGeneratorView: View {
             }
         }
         .animation(.default, value: path.last)
-        .onAppear { loadFromFile() }
-        .onChange(of: editingFileURL) { _ in loadFromFile() }
+        .animation(.default, value: path.last)
+        .animation(.default, value: path.last)
+        .onAppear {
+            // Priority: Draft > File > New
+            loadContent()
+            hasLoadedInitially = true
+        }
+        .onChange(of: editingFileURL) { _ in
+             loadContent()
+        }
         .onChange(of: isPresented) { presented in
-             if presented { loadFromFile() }
+            if presented {
+                loadContent()
+            }
+        }
+        // Save draft on every change
+        .onChange(of: model) { newModel in
+            // Only save draft if we are currently presented (editing)
+            // AND we consider the content valid (e.g. not during a reset/load transition if we could track it)
+            if isPresented {
+                ConfigDraftManager.shared.saveDraft(for: editingFileURL, model: newModel)
+            }
+        }
+    }
+    
+    private func loadContent() {
+        // 1. Try to restore draft (memory cache)
+        if let draft = ConfigDraftManager.shared.getDraft(for: editingFileURL) {
+            // Only restore if our current model is different, or we just appeared
+            // But since draft is the source of truth for edits, we just take it.
+            if model != draft {
+                self.model = draft
+            }
+            // Sync last loaded to avoid subsequent file reloads
+            self.lastLoadedURL = editingFileURL
+            return
+        }
+        
+        // 2. If no draft, load from file if needed
+        // We load if:
+        // - We haven't loaded this URL yet (lastLoadedURL != editingFileURL)
+        // - Or editingFileURL is nil (New Config) AND we want to ensure fresh start if no draft
+        if editingFileURL != lastLoadedURL {
+            if editingFileURL == nil {
+                 // New file without draft -> Reset
+                 model = EasyTierConfigModel()
+            } else {
+                loadFromFile()
+            }
+            lastLoadedURL = editingFileURL
         }
     }
     
@@ -425,8 +513,17 @@ struct ConfigGeneratorView: View {
                 }
                 
                 // 8. SOCKS5 服务器 (SOCKS5 Server)
-                SwiftUI.Section("SOCKS5 服务器") {
+                SwiftUI.Section(header: Text("SOCKS5 服务器"), footer: Text("开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 EasyTier 网络。")) {
                     Toggle("启用", isOn: $model.enableSocks5)
+                    if model.enableSocks5 {
+                        HStack {
+                            Text("监听端口")
+                            Spacer()
+                            TextField("", value: $model.socks5Port, format: .number.grouping(.never))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 80)
+                        }
+                    }
                 }
                 
                 // 9. 出口节点列表 (Exit Nodes)
@@ -610,7 +707,7 @@ struct ConfigGeneratorView: View {
                     
                     HStack {
                         Text("密码")
-                        SecureField("选填", text: $model.networkSecret)
+                        TextField("选填", text: $model.networkSecret)
                             .multilineTextAlignment(.trailing)
                             .labelsHidden()
                             .frame(maxWidth: .infinity) // 扩大点击区域
@@ -831,22 +928,32 @@ struct ConfigGeneratorView: View {
         if let editing = editingFileURL {
             fileURL = editing
         } else {
-            let filename = "\(model.instanceName)-\(Int(Date().timeIntervalSince1970)).toml"
-            guard let currentDir = ConfigManager.shared.currentDirectory else {
-                saveMessage = "未选择配置目录"; showSaveError = true; return
-            }
-            fileURL = currentDir.appendingPathComponent(filename)
+            // Should not happen as we pass URL for new files too in ContentView, 
+            // but just in case:
+            guard let cur = ConfigManager.shared.currentDirectory else { return }
+            let name = model.instanceName.isEmpty ? "easytier.toml" : "\(model.instanceName).toml"
+            fileURL = cur.appendingPathComponent(name)
         }
         
+        // Prepare peers based on mode
         var peersToSave = model.manualPeers
         if model.peerMode == .publicServer { peersToSave = ["tcp://public.easytier.top:11010"] }
         else if model.peerMode == .standalone { peersToSave = [] }
         
-        let tomlContent = generateTOML(peers: peersToSave)
-        try? tomlContent.write(to: fileURL, atomically: true, encoding: .utf8)
-        ConfigManager.shared.refreshConfigs()
-        onSave()
-        withAnimation { isPresented = false }
+        let content = generateTOML(peers: peersToSave)
+        
+        do {
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            // Clear draft on successful save, so next open reads from file (which is now same as draft)
+            ConfigDraftManager.shared.clearDraft(for: editingFileURL)
+            
+            onSave()
+            isPresented = false
+        } catch {
+            saveMessage = "保存失败: \(error.localizedDescription)"
+            showSaveError = true
+        }
     }
     
     private func loadFromFile() {
@@ -911,6 +1018,9 @@ struct ConfigGeneratorView: View {
                     }
                 case "socks5_proxy":
                     m.enableSocks5 = true
+                    if let portStr = val.split(separator: ":").last, let p = Int(portStr) {
+                        m.socks5Port = p
+                    }
                 case "exit_nodes":
                     if val.hasPrefix("[") && val.hasSuffix("]") {
                         let inner = val.dropFirst().dropLast()
@@ -1015,9 +1125,8 @@ struct ConfigGeneratorView: View {
             toml += "\nipv4 = \"\(model.ipv4)/\(model.cidr)\""
         }
         
-        // Socks5
         if model.enableSocks5 {
-            toml += "\nsocks5_proxy = \"socks5://0.0.0.0:1080\""
+            toml += "\nsocks5_proxy = \"socks5://0.0.0.0:\(model.socks5Port)\""
         }
         
         // Exit Nodes

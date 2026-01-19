@@ -28,6 +28,12 @@ public protocol HelperProtocol {
     /// - Parameter reply: 回调，返回版本字符串
     func getVersion(reply: @escaping (String) -> Void)
     
+    /// 获取最近的 JSON 事件（用于实时事件流）
+    /// - Parameters:
+    ///   - sinceIndex: 从哪个索引开始获取（0 表示获取所有缓存的事件）
+    ///   - reply: 回调，返回 (JSON 事件数组, 下一个索引)
+    func getRecentEvents(sinceIndex: Int, reply: @escaping ([String], Int) -> Void)
+    
     /// 退出 Helper 进程
     func quitHelper(reply: @escaping (Bool) -> Void)
 }
@@ -35,5 +41,5 @@ public protocol HelperProtocol {
 /// Helper 的 Mach 服务名称
 public let kHelperMachServiceName = "com.alick.swiftier.helper"
 /// Helper 的目标版本号 (Helper Protocol 版本) - 升级以触发自动更新
-public let kTargetHelperVersion = "1.2.0"
+public let kTargetHelperVersion = "1.3.0"
 

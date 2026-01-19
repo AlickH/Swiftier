@@ -5,10 +5,16 @@ import Combine
 class PermissionManager: ObservableObject {
     static let shared = PermissionManager()
     
-    @Published var isFDAGranted: Bool = false
+    @Published var isFDAGranted: Bool
     
     private init() {
-        checkFullDiskAccess()
+        // Synchronous initial check to prevent UI flash
+        let protectedPath = "/Library/Application Support/com.apple.TCC"
+        var granted = false
+        if let _ = try? FileManager.default.contentsOfDirectory(atPath: protectedPath) {
+            granted = true
+        }
+        self.isFDAGranted = granted
     }
     
     func checkFullDiskAccess() {
@@ -17,16 +23,17 @@ class PermissionManager: ObservableObject {
         // 系统也会因为这次尝试而将 APP 自动登记到“完全磁盘访问权限”列表中。
         let protectedPath = "/Library/Application Support/com.apple.TCC"
         
-        do {
-            _ = try FileManager.default.contentsOfDirectory(atPath: protectedPath)
-            if !isFDAGranted {
-                DispatchQueue.main.async { self.isFDAGranted = true }
+        DispatchQueue.global(qos: .userInitiated).async {
+            var granted = false
+            if let _ = try? FileManager.default.contentsOfDirectory(atPath: protectedPath) {
+                granted = true
             }
-        } catch {
-            if isFDAGranted {
-                DispatchQueue.main.async { self.isFDAGranted = false }
+            
+            DispatchQueue.main.async {
+                if self.isFDAGranted != granted {
+                    self.isFDAGranted = granted
+                }
             }
-            // 这里虽然 catch 了错误，但“访问尝试”已经完成了，系统已经记住了 Swiftier
         }
     }
     

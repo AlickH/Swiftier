@@ -83,10 +83,11 @@ final class HelperManager {
         xpcConnection = nil
     }
     
-    private func getHelper() -> HelperProtocol? {
+    private func getHelper(errorHandler: ((Error) -> Void)? = nil) -> HelperProtocol? {
         let connection = getConnection()
         return connection.remoteObjectProxyWithErrorHandler { [weak self] error in
             self?.log("XPC Error: \(error.localizedDescription)")
+            errorHandler?(error)
         } as? HelperProtocol
     }
     
@@ -141,27 +142,42 @@ final class HelperManager {
     /// 启动 easytier-core
     func startCore(configPath: String, rpcPort: String, consoleLevel: String, completion: @escaping (Bool, String?) -> Void) {
         log("Starting core via XPC... Level: \(consoleLevel)")
+        log("Current SMAppService status: \(service.status.rawValue) (\(serviceStatus))")
         
         // 确保 helper 已安装
         guard service.status == .enabled else {
-            log("Helper not installed, installing first...")
+            log("Helper not installed (status=\(service.status.rawValue)), installing first...")
             installHelper { [weak self] success, error in
                 if success {
+                    self?.log("Helper installation succeeded, retrying startCore...")
                     self?.startCore(configPath: configPath, rpcPort: rpcPort, consoleLevel: consoleLevel, completion: completion)
                 } else {
+                    self?.log("Helper installation failed: \(error ?? "unknown")")
                     completion(false, error ?? "Failed to install helper")
                 }
             }
             return
         }
         
+        log("Helper is enabled, proceeding with XPC call...")
         // 获取 easytier-core 可执行文件路径
         guard let corePath = getCorePath() else {
             completion(false, "Cannot find easytier-core executable")
             return
         }
         
-        guard let helper = getHelper() else {
+        // 定义 XPC 错误处理器
+        let xpcErrorHandler: (Error) -> Void = { error in
+            self.log("XPC communication failed: \(error.localizedDescription)")
+            // 如果连接失败，可能是服务已死但状态仍为 enabled。尝试强制重装。
+            // 避免无限递归：这里只在第一次失败时尝试重装，或者简单地返回失败让上层重试
+            // 简单策略：直接报错，EasyTierRunner 只有一层 Retry。
+            // 但如果这里能检测到 invalidation，最好主动 invalid connection 触发重连
+            self.invalidateConnection()
+            completion(false, "XPC Error: \(error.localizedDescription)")
+        }
+
+        guard let helper = getHelper(errorHandler: xpcErrorHandler) else {
             completion(false, "Cannot connect to helper")
             return
         }
@@ -179,6 +195,7 @@ final class HelperManager {
                     self.installHelper { success, error in
                         if success {
                             self.log("Helper auto-updated successfully. Retrying start...")
+                            // 递归调用（注意：这可能会导致死循环如果安装一直成功但连接一直失败，建议增加深度控制，暂且认为安装成功就能连上）
                             self.startCore(configPath: configPath, rpcPort: rpcPort, consoleLevel: consoleLevel, completion: completion)
                         } else {
                             completion(false, "Failed to update helper: \(error ?? "Unknown error")")
@@ -218,15 +235,29 @@ final class HelperManager {
     func stopCore(completion: @escaping (Bool) -> Void) {
         log("Stopping core via XPC...")
         
-        guard let helper = getHelper() else {
-            log("Cannot connect to helper")
+        // 定义 XPC 错误处理器，确保即使 XPC 失败也调用 completion
+        var completionCalled = false
+        let xpcErrorHandler: (Error) -> Void = { [weak self] error in
+            self?.log("stopCore XPC failed: \(error.localizedDescription)")
+            self?.invalidateConnection()
+            if !completionCalled {
+                completionCalled = true
+                DispatchQueue.main.async { completion(false) }
+            }
+        }
+        
+        guard let helper = getHelper(errorHandler: xpcErrorHandler) else {
+            log("Cannot connect to helper for stopCore")
             completion(false)
             return
         }
         
         helper.stopCore { success in
-            DispatchQueue.main.async {
-                completion(success)
+            if !completionCalled {
+                completionCalled = true
+                DispatchQueue.main.async {
+                    completion(success)
+                }
             }
         }
     }
@@ -282,6 +313,23 @@ final class HelperManager {
         
         helper.quitHelper { _ in
             completion()
+        }
+    }
+    
+    /// 获取最近的 JSON 事件（用于实时事件流）
+    /// - Parameters:
+    ///   - sinceIndex: 从哪个索引开始获取
+    ///   - completion: 回调，返回 (JSON 事件数组, 下一个索引)
+    func getRecentEvents(sinceIndex: Int, completion: @escaping ([String], Int) -> Void) {
+        guard let helper = getHelper() else {
+            completion([], sinceIndex)
+            return
+        }
+        
+        helper.getRecentEvents(sinceIndex: sinceIndex) { events, nextIndex in
+            DispatchQueue.main.async {
+                completion(events, nextIndex)
+            }
         }
     }
     

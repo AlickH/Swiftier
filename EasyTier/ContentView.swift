@@ -33,11 +33,13 @@ struct ContentView: View {
             .frame(width: windowWidth, height: windowHeight)
             
             // 日志全屏覆盖层
+            // 日志全屏覆盖层
             if showLogView {
                 LogView(isPresented: $showLogView)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    // 背景略微加深一点点，以便阅读文字，但不要完全不透明
                     .background(.regularMaterial)
+                    // Compositing Group forces atomic rendering, preventing "content float" artifacts during slide
+                    .compositingGroup()
                     .zIndex(100)
                     .transition(.move(edge: .bottom))
             }
@@ -72,6 +74,7 @@ struct ContentView: View {
                 editingFileURL: selectedConfig,
                 onSave: { configManager.refreshConfigs() }
             )
+            .id(selectedConfig) // Force reset state when config changes
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .zIndex(103)
             .offset(y: showConfigGenerator ? 0 : windowHeight)
@@ -149,6 +152,25 @@ struct ContentView: View {
             // 刷新后立刻尝试选中
             if !configManager.configFiles.isEmpty && selectedConfig == nil {
                 selectedConfig = configManager.configFiles.first
+            }
+            
+            // 同步 Core 状态，完成后根据情况决定是否自动连接
+            runner.syncWithCoreState { coreAlreadyRunning in
+                // 场景1&2: 如果 Core 已经在运行，无论自动连接是否开启，都继承状态（已在 syncWithCoreState 内处理）
+                // 场景3: 如果自动连接关闭且 Core 未运行，什么都不做
+                // 场景4: 如果自动连接关闭但 Core 已运行，UI 已更新（在 syncWithCoreState 内处理）
+                
+                // 只有当 Core 未运行 且 用户开启了自动连接 时，才自动启动
+                if !coreAlreadyRunning && UserDefaults.standard.bool(forKey: "connectOnStart") {
+                    if let path = selectedConfig?.path {
+                        print("[ContentView] Auto-Connect: Core not running, starting now...")
+                        runner.toggleService(configPath: path)
+                    }
+                } else if coreAlreadyRunning {
+                    print("[ContentView] Core already running, inheriting state")
+                } else {
+                    print("[ContentView] No auto-connect, waiting for user action")
+                }
             }
         }
     }
@@ -314,37 +336,54 @@ struct ContentView: View {
                 }
 
                 // 2) 节点卡片容器
-                if !runner.peers.isEmpty && runner.isRunning {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), spacing: 10),
-                                GridItem(.flexible(), spacing: 10)
-                            ],
-                            spacing: 10
-                        ) {
-                            ForEach(runner.peers) { peer in
-                                PeerCard(peer: peer)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .bottom),
-                                        removal: .opacity
-                                    ))
+                if runner.isRunning {
+                    if !runner.peers.isEmpty {
+                        // 2a) 节点卡片容器
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(.flexible(), spacing: 10),
+                                    GridItem(.flexible(), spacing: 10)
+                                ],
+                                spacing: 10
+                            ) {
+                                ForEach(runner.peers) { peer in
+                                    PeerCard(peer: peer)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .transition(.asymmetric(
+                                            insertion: .move(edge: .bottom),
+                                            removal: .opacity
+                                        ))
+                                }
                             }
                         }
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .padding(.horizontal, 12)
+                        .padding(.top, 180)
+                        .zIndex(1)
+                        .padding(.bottom, 12)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: runner.peers.map(\.id).joined().hashValue)
+                    } else {
+                        // 2b) 占位提示 (正在获取节点)
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .controlSize(.regular)
+                                .scaleEffect(1.2)
+                            Text("节点加载中")
+                                .font(.title3.bold())
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 180)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .offset(y: -20)
+                        .zIndex(1)
+                        .transition(.opacity)
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .padding(.horizontal, 12)
-                    .padding(.top, 180)
-                    .zIndex(1)
-                    .padding(.bottom, 12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .opacity
-                    ))
-                    // Animation scoped to this view
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: runner.peers.map(\.id).joined().hashValue)
                 }
 
                 // 3) 启动按钮
@@ -370,8 +409,8 @@ struct ContentView: View {
                 .zIndex(10)
             }
             // Only apply isRunning animation to the container (for layout/button transitions)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: runner.isRunning)
-            .animation(.easeInOut(duration: 0.2), value: showLogView)
+            .animation(.spring(response: 1.0, dampingFraction: 0.8), value: runner.isRunning)
+            .animation(.spring(response: 0.55, dampingFraction: 0.8), value: showLogView)
         }
     }
 
@@ -485,19 +524,22 @@ struct RippleRings: View {
         colorScheme == .light ? 0.9 : 0.1
     }
 
+    @ViewBuilder
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            let phase = (t.truncatingRemainder(dividingBy: duration)) / duration
+        // 关键优化：只在可见时才渲染 TimelineView，避免不必要的帧计算
+        if isVisible {
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let phase = (t.truncatingRemainder(dividingBy: duration)) / duration
 
-            ZStack {
-                ring(progress: phaseShifted(phase, by: 0.0))
-                ring(progress: phaseShifted(phase, by: 1.0 / 3.0))
-                ring(progress: phaseShifted(phase, by: 2.0 / 3.0))
+                ZStack {
+                    ring(progress: phaseShifted(phase, by: 0.0))
+                    ring(progress: phaseShifted(phase, by: 1.0 / 3.0))
+                    ring(progress: phaseShifted(phase, by: 2.0 / 3.0))
+                }
             }
+            .transition(.opacity.animation(.easeInOut(duration: 0.5)))
         }
-        .opacity(isVisible ? 1.0 : 0.0)  // 关键：跟随外部控制淡入淡出
-        .animation(.easeInOut(duration: 0.5), value: isVisible)  // 0.5s 淡入淡出，匹配 spring
     }
 
     // phaseShifted 和 ring 保持完全不变

@@ -96,11 +96,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let autoConnect = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
         guard autoConnect else { return }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            let configs = ConfigManager.shared.refreshConfigs()
-            if let config = configs.first {
-                print("Auto-connecting with config: \(config.lastPathComponent)")
-                EasyTierRunner.shared.toggleService(configPath: config.path)
+        // 先检查 Core 是否已经在运行
+        CoreService.shared.getStatus { running, _ in
+            if running {
+                // 已经在运行，同步状态即可
+                print("Core already running, syncing state...")
+                EasyTierRunner.shared.syncWithCoreState()
+            } else {
+                // 未运行，执行自动连接
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let configs = ConfigManager.shared.refreshConfigs()
+                    if let config = configs.first {
+                        print("Auto-connecting with config: \(config.lastPathComponent)")
+                        EasyTierRunner.shared.toggleService(configPath: config.path)
+                    }
+                }
             }
         }
     }

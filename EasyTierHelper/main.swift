@@ -13,7 +13,7 @@ import Foundation
 let kHelperMachServiceName = "com.alick.swiftier.helper"
 
 /// Helper 版本号（用于检测是否需要升级）
-let kHelperVersion = "1.2.0"
+let kHelperVersion = "1.3.0"
 
 // MARK: - Logger
 
@@ -22,6 +22,9 @@ let logPath = "/var/log/swiftier-helper.log"
 func log(_ message: String) {
     let timestamp = ISO8601DateFormatter().string(from: Date())
     let line = "[\(timestamp)] [Helper] \(message)\n"
+    
+    // Also print to stdout for debugging in Console.app (when not daemonized) or Xcode
+    // print(line, terminator: "") 
     
     let url = URL(fileURLWithPath: logPath)
     
@@ -55,6 +58,12 @@ class CoreProcessManager {
     private var coreStartTime: Date?
     private let processLock = NSLock()
     
+    // Event buffer for JSON events from Core
+    private var eventBuffer: [String] = []
+    private var eventIndex: Int = 0 // Global index for tracking
+    private let eventLock = NSLock()
+    private let maxEventBufferSize = 500 // Keep last 500 events
+    
     private init() {}
     
     var isRunning: Bool {
@@ -76,9 +85,59 @@ class CoreProcessManager {
         return start.timeIntervalSince1970
     }
     
+    /// Get events since a given index
+    /// Returns (events, nextIndex)
+    func getEvents(sinceIndex: Int) -> ([String], Int) {
+        eventLock.lock()
+        defer { eventLock.unlock() }
+        
+        // Calculate which events to return
+        let bufferStartIndex = max(0, eventIndex - eventBuffer.count)
+        
+        if sinceIndex >= eventIndex {
+            // No new events
+            return ([], eventIndex)
+        }
+        
+        if sinceIndex < bufferStartIndex {
+            // Requested events have been rotated out, return all current buffer
+            return (eventBuffer, eventIndex)
+        }
+        
+        // Return events from sinceIndex to current
+        let offsetInBuffer = sinceIndex - bufferStartIndex
+        let events = Array(eventBuffer.dropFirst(offsetInBuffer))
+        return (events, eventIndex)
+    }
+    
+    /// Add an event to the buffer
+    private func addEvent(_ jsonLine: String) {
+        eventLock.lock()
+        defer { eventLock.unlock() }
+        
+        eventBuffer.append(jsonLine)
+        eventIndex += 1
+        
+        // Rotate buffer if too large
+        if eventBuffer.count > maxEventBufferSize {
+            eventBuffer.removeFirst(eventBuffer.count - maxEventBufferSize)
+        }
+    }
+    
+    /// Clear event buffer (called on Core restart)
+    private func clearEvents() {
+        eventLock.lock()
+        defer { eventLock.unlock() }
+        eventBuffer.removeAll()
+        // Don't reset eventIndex to avoid confusion with sinceIndex tracking
+    }
+    
     func start(corePath: String, configPath: String, rpcPort: String, consoleLevel: String) throws {
         processLock.lock()
         defer { processLock.unlock() }
+        
+        // Clear events from previous session
+        clearEvents()
         
         // 先停止已有进程
         if coreProcess?.isRunning == true {
@@ -107,11 +166,30 @@ class CoreProcessManager {
         process.standardOutput = outputPipe
         process.standardError = outputPipe
         
-        // 异步读取输出并记录日志
-        outputPipe.fileHandleForReading.readabilityHandler = { handle in
+        // Buffer for incomplete lines
+        var lineBuffer = ""
+        
+        // 异步读取输出并记录日志 + 捕获 JSON 事件
+        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
-                log("Core output: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                // Process line by line
+                lineBuffer += output
+                while let newlineRange = lineBuffer.range(of: "\n") {
+                    let line = String(lineBuffer[..<newlineRange.lowerBound])
+                    lineBuffer = String(lineBuffer[newlineRange.upperBound...])
+                    
+                    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty { continue }
+                    
+                    // Log to file
+                    log("Core output: \(trimmed)")
+                    
+                    // Check if this is a JSON event line (starts with { and contains "event")
+                    if trimmed.hasPrefix("{") && trimmed.contains("\"event\"") {
+                        self?.addEvent(trimmed)
+                    }
+                }
             }
         }
         
@@ -167,6 +245,7 @@ protocol HelperProtocol {
     func getCoreStatus(reply: @escaping (Int32) -> Void)
     func getCoreStartTime(reply: @escaping (Double) -> Void)
     func getVersion(reply: @escaping (String) -> Void)
+    func getRecentEvents(sinceIndex: Int, reply: @escaping ([String], Int) -> Void)
     func quitHelper(reply: @escaping (Bool) -> Void)
 }
 
@@ -229,6 +308,11 @@ class HelperDelegate: NSObject, NSXPCListenerDelegate, HelperProtocol {
     
     func getVersion(reply: @escaping (String) -> Void) {
         reply(kHelperVersion)
+    }
+    
+    func getRecentEvents(sinceIndex: Int, reply: @escaping ([String], Int) -> Void) {
+        let (events, nextIndex) = CoreProcessManager.shared.getEvents(sinceIndex: sinceIndex)
+        reply(events, nextIndex)
     }
     
     func quitHelper(reply: @escaping (Bool) -> Void) {

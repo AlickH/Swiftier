@@ -20,7 +20,14 @@ final class CoreDownloader: ObservableObject {
     @Published var currentVersion: String?
     
     private init() {
-        checkInstallation()
+        // Pre-check installation status synchronously to prevent UI flash
+        // We replicate path logic here because we can't access self.corePath before initialization is complete (if strict)
+        // or just to be explicit before 'checkInstallation' starts its async loop/logic if any.
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let coreBin = appSupport.appendingPathComponent("Swiftier/bin/easytier-core").path
+        
+        let exists = FileManager.default.fileExists(atPath: coreBin) && FileManager.default.isExecutableFile(atPath: coreBin)
+        self.isInstalled = exists
     }
     
     private let repoOwner = "EasyTier"
