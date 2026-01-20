@@ -223,37 +223,43 @@ struct ConfigGeneratorView: View {
         .animation(.default, value: path.last)
         .animation(.default, value: path.last)
         .onAppear {
-            // Priority: Draft > File > New
-            loadContent()
-            hasLoadedInitially = true
+            // Initial load (e.g. preview or first render)
+            // If already visible, don't force reset unless necessary logic dictates
+            if isPresented && !hasLoadedInitially {
+               loadContent(forceReset: true)
+               hasLoadedInitially = true
+            }
         }
         .onChange(of: editingFileURL) { _ in
-             loadContent()
+             // File changed underneath (unlikely in modal) but handle it
+             loadContent(forceReset: true)
         }
         .onChange(of: isPresented) { presented in
             if presented {
-                loadContent()
+                // Fresh session: Always clear old drafts and load from disk/new
+                loadContent(forceReset: true)
             }
         }
         // Save draft on every change
         .onChange(of: model) { newModel in
-            // Only save draft if we are currently presented (editing)
-            // AND we consider the content valid (e.g. not during a reset/load transition if we could track it)
             if isPresented {
                 ConfigDraftManager.shared.saveDraft(for: editingFileURL, model: newModel)
             }
         }
     }
     
-    private func loadContent() {
+    private func loadContent(forceReset: Bool = false) {
+        if forceReset {
+            ConfigDraftManager.shared.clearDraft(for: editingFileURL)
+            self.lastLoadedURL = nil // Force reload check
+        }
+    
         // 1. Try to restore draft (memory cache)
-        if let draft = ConfigDraftManager.shared.getDraft(for: editingFileURL) {
-            // Only restore if our current model is different, or we just appeared
-            // But since draft is the source of truth for edits, we just take it.
+        if !forceReset, let draft = ConfigDraftManager.shared.getDraft(for: editingFileURL) {
+            // Only restore if our current model is different
             if model != draft {
                 self.model = draft
             }
-            // Sync last loaded to avoid subsequent file reloads
             self.lastLoadedURL = editingFileURL
             return
         }
@@ -287,6 +293,8 @@ struct ConfigGeneratorView: View {
                             .multilineTextAlignment(.trailing)
                             .textFieldStyle(.plain)
                             .labelsHidden()
+                            .textContentType(.none)
+                            .disableAutocorrection(true)
                     }
                     
                     HStack {
@@ -319,6 +327,7 @@ struct ConfigGeneratorView: View {
                         .frame(width: 80)
                         .textFieldStyle(.plain)
                         .labelsHidden()
+                        .textContentType(.none)
                     }
                 }
                 
@@ -425,6 +434,7 @@ struct ConfigGeneratorView: View {
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 80)
                                 .labelsHidden()
+                                .textContentType(.none)
                         }
                     }
                 }
@@ -440,6 +450,8 @@ struct ConfigGeneratorView: View {
                             ))
                             .textFieldStyle(.plain)
                             .labelsHidden()
+                            .textContentType(.none)
+                            .disableAutocorrection(true)
                             
                             Spacer()
                             
@@ -522,6 +534,7 @@ struct ConfigGeneratorView: View {
                             TextField("", value: $model.socks5Port, format: .number.grouping(.never))
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 80)
+                                .textContentType(.none)
                         }
                     }
                 }
@@ -623,6 +636,8 @@ struct ConfigGeneratorView: View {
                     ))
                     .textFieldStyle(.plain)
                     .labelsHidden()
+                    .textContentType(.none)
+                    .disableAutocorrection(true)
                     
                     Spacer()
                     
@@ -675,6 +690,8 @@ struct ConfigGeneratorView: View {
     var mainView: some View {
         VStack(spacing: 0) {
             header(title: "配置生成器", leftBtn: "取消", rightBtn: "生成") {
+                // Clear draft on cancel so next open reads from disk
+                ConfigDraftManager.shared.clearDraft(for: editingFileURL)
                 withAnimation { isPresented = false }
             } rightAction: {
                 generateAndSave()
@@ -732,6 +749,8 @@ struct ConfigGeneratorView: View {
                                 TextField("tcp://...", text: safePeerBinding(at: i))
                                     .textFieldStyle(.plain)
                                     .labelsHidden()
+                                    .textContentType(.none)
+                                    .disableAutocorrection(true)
                                 
                                 Spacer()
                                 

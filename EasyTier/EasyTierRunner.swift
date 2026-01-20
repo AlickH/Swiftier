@@ -355,29 +355,38 @@ final class EasyTierRunner: ObservableObject {
                     rx: self.formatBytes(totalRx),
                     tx: self.formatBytes(totalTx),
                     tunnel: "LOCAL",
-                    nat: self.natTypeString(myNode.stunInfo?.udpNATType ?? 0),
-                    version: myNode.version
+                    nat: myNode.stunInfo?.udpNATType.description ?? "Unknown",
+                    version: myNode.version,
+                    myNodeData: myNode
                 ))
             }
             
             // 4. 构建远程节点列表
             for pair in status.peerRoutePairs {
-                let peerId = pair.route.peerId
+                // peerId unused
                 var rxVal = "0 B", txVal = "0 B", latencyVal = "", lossVal = "", tunnelVal = ""
                 
                 if let peer = pair.peer {
                     var cRx = 0, cTx = 0, latSum = 0, latCount = 0, lossSum = 0.0, lossCount = 0, tunnels = Set<String>()
                     for conn in peer.conns {
-                        if let s = conn.stats { latSum += s.latencyUs; latCount += 1; cRx += s.rxBytes; cTx += s.txBytes }
-                        lossSum += conn.lossRate; lossCount += 1
+                        // Note: stats is optional in new model
+                        if let s = conn.stats { 
+                            latSum += s.latencyUs; latCount += 1
+                            cRx += s.rxBytes; cTx += s.txBytes 
+                        }
+                        
+                        lossSum += conn.lossRate
+                        lossCount += 1
+                        
                         if let t = conn.tunnel?.tunnelType { tunnels.insert(t.uppercased()) }
                     }
                     rxVal = formatBytes(cRx); txVal = formatBytes(cTx)
                     if latCount > 0 { latencyVal = String(format: "%.1f", Double(latSum)/Double(latCount)/1000.0) }
                     if lossCount > 0 { lossVal = String(format: "%.1f%%", (lossSum/Double(lossCount))*100.0) }
                     tunnelVal = tunnels.sorted().joined(separator: "&")
-                } else if let pathLat = pair.route.pathLatency, pathLat > 0 {
-                    latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
+                } else if let pathLat = pair.route.pathLatency as Int?, pathLat > 0 {
+                    // New model has pathLatency as Int (us)
+                     latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
                 }
                 
                 fetchedPeers.append(PeerInfo(
@@ -386,8 +395,9 @@ final class EasyTierRunner: ObservableObject {
                     hostname: pair.route.hostname,
                     cost: pair.route.cost == 1 ? "P2P" : "Relay(\(pair.route.cost))",
                     latency: latencyVal, loss: lossVal, rx: rxVal, tx: txVal, tunnel: tunnelVal,
-                    nat: natTypeString(pair.route.stunInfo?.udpNATType ?? 0),
-                    version: pair.route.version
+                    nat: pair.route.stunInfo?.udpNATType.description ?? "Unknown",
+                    version: pair.route.version,
+                    fullData: pair
                 ))
             }
         }
@@ -443,13 +453,7 @@ final class EasyTierRunner: ObservableObject {
         return String(format: "%.1f MB/s", mb)
     }
     
-    private func natTypeString(_ type: Int) -> String {
-        switch type {
-        case 1: return "Open"; case 2: return "NoPAT"; case 3: return "FullCone"; case 4: return "Restricted"
-        case 5: return "PortRestricted"; case 6: return "Symmetric"; case 7: return "SymUDPFirewall"
-        case 8, 9: return "SymEasy"; default: return "Unknown"
-        }
-    }
+    // REMOVED: private func natTypeString
     
     private func formatBytes(_ bytes: Int) -> String {
         if bytes < 1024 { return "\(bytes) B" }

@@ -438,7 +438,16 @@ struct ContentView: View {
         
         var body: some View {
             ZStack(alignment: .bottom) {
-                // Content (Below the line but drawn first)
+                // Sparkline (Background layer)
+                if isVisible {
+                    Sparkline(data: history, color: color, maxScale: maxVal, paused: !isVisible)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, 24)
+                        .zIndex(0)
+                        .allowsHitTesting(false)
+                }
+                
+                // Content (Foreground layer - Floating above sparkline)
                 VStack(alignment: .leading, spacing: 2) {
                     // Title (Left Aligned)
                     HStack(spacing: 4) {
@@ -456,27 +465,20 @@ struct ContentView: View {
                     // Value (Split style - Centered)
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
                         Text(splitValue.number)
-                            .font(.system(size: 24, weight: .bold, design: .monospaced)) // Larger & Bold
+                            .font(.system(size: 24, weight: .bold, design: .monospaced))
                         Text(splitValue.unit)
-                            .font(.system(size: 11, weight: .bold, design: .monospaced)) // Changed to .bold
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            // Removed .foregroundColor(.secondary) to match number color
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
+                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1) // Optional: Added shadow for better legibility over sparkline
                     
                     Spacer()
                     
                     Color.clear.frame(height: 12)
                 }
                 .padding(.horizontal, 12)
-                .zIndex(1) // Above background but below sparkline path if we want sparkline on VERY top
-                
-                // Sparkline (On top layer as requested)
-                if isVisible {
-                    Sparkline(data: history, color: color, maxScale: maxVal, paused: !isVisible)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity) // Fills the card
-                        .zIndex(10) // Top layer
-                        .allowsHitTesting(false) // Don't block interactions
-                }
+                .zIndex(20)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 85) // Reduced from 100 to 85 to fix crowding

@@ -657,14 +657,10 @@ class LogParser: ObservableObject {
                 
                 // 2. Regular Text Log
                 var timestamp = ""
-                var cleanContent = content
-                var isNewLogLine = false
-                
                 // Robust Regex for Timestamp detection (Includes fractional .123 and Timezone +08:00)
                 if let range = content.range(of: "^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:?[0-9]{2})?", options: .regularExpression) {
                     // Extract full timestamp token (until space)
                     let start = range.lowerBound
-                    // Find end of timestamp (space or end of string)
                     let remainder = content[start...]
                     if let spaceIndex = remainder.firstIndex(of: " ") {
                          timestamp = String(remainder[..<spaceIndex])
@@ -672,33 +668,43 @@ class LogParser: ObservableObject {
                          timestamp = String(remainder)
                     }
                     
-                    cleanContent = String(content[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    var cleanContent = String(content[range.upperBound...]).trimmingCharacters(in: .whitespaces)
                     
-                    // Strip Level (INFO, WARN...) from the start of the message body
-                    if let levelRange = cleanContent.range(of: "^(INFO|WARN|ERROR|DEBUG|TRACE)\\b", options: [.regularExpression, .caseInsensitive]) {
-                        cleanContent = String(cleanContent[levelRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    // STRIP & DETECT Level
+                    var detectedLevel: LogLevel = .info
+                    
+                    if let range = cleanContent.range(of: "^(INFO|WARN|ERROR|DEBUG|TRACE)\\b", options: [.regularExpression, .caseInsensitive]) {
+                        let levelStr = String(cleanContent[range]).uppercased()
+                        switch levelStr {
+                        case "ERROR": detectedLevel = .error
+                        case "WARN": detectedLevel = .warn
+                        case "DEBUG": detectedLevel = .debug
+                        case "TRACE": detectedLevel = .trace
+                        default: detectedLevel = .info
+                        }
+                        cleanContent = String(cleanContent[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    } else {
+                        let lower = cleanContent.lowercased()
+                        if lower.contains("error") { detectedLevel = .error }
+                        else if lower.contains("warn") { detectedLevel = .warn }
+                        else if lower.contains("debug") { detectedLevel = .debug }
+                        else if lower.contains("trace") { detectedLevel = .trace }
                     }
 
-                    isNewLogLine = true
-                }
-                
-                if isNewLogLine {
-                    var level: LogLevel = .info
-                    let lower = cleanContent.lowercased()
-                    if lower.contains("error") { level = .error }
-                    else if lower.contains("warn") { level = .warn }
-                    else if lower.contains("debug") { level = .debug }
-                    else if lower.contains("trace") { level = .trace }
+                    // Scope variable to hold the final level
+                    let finalLevel = detectedLevel 
                     
                     newEntries.append(LogEntry(
                         timestamp: timestamp, 
                         cleanContent: cleanLogContent(cleanContent),
                         fullText: capString(content, limit: maxFullTextLength), 
-                        level: level
+                        level: finalLevel
                     ))
                     
                     parseTextEvent(content: cleanContent, timestamp: timestamp, dateParser: localParseDate, into: &newEvents)
+                    
                 } else if let last = newEntries.last {
+                    // Continuation of previous line
                     let updatedFull = capString(last.fullText + "\n" + content, limit: maxFullTextLength)
                     let updatedClean = cleanLogContent(last.cleanContent + "\n" + content)
                     newEntries[newEntries.count - 1] = LogEntry(
@@ -709,6 +715,7 @@ class LogParser: ObservableObject {
                         level: last.level
                     )
                 } else {
+                    // Orphan text without previous entry (should rarely happen)
                     newEntries.append(LogEntry(
                         timestamp: "", 
                         cleanContent: cleanLogContent(content),

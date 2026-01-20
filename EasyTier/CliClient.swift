@@ -28,6 +28,11 @@ struct PeerInfo: Identifiable, Equatable {
     var pathLen: String? { extraInfo["route_path_len"] }
     // Add more as needed based on observation
     
+    // 针对远程节点的完整数据信息
+    var fullData: EasyTierStatus.PeerRoutePair? = nil
+    // 针对“本机”节点的完整信息
+    var myNodeData: EasyTierStatus.NodeInfo? = nil
+    
     // 只要业务数据不变，SwiftUI 就不会在运行中刷新卡片视图（防止闪烁）
     var id: String { "\(sessionID.uuidString)-\(ipv4)-\(hostname)-\(tunnel)" }
 
@@ -42,7 +47,9 @@ struct PeerInfo: Identifiable, Equatable {
                lhs.tunnel == rhs.tunnel &&
                lhs.nat == rhs.nat &&
                lhs.version == rhs.version &&
-               lhs.extraInfo == rhs.extraInfo
+               lhs.extraInfo == rhs.extraInfo &&
+               lhs.fullData == rhs.fullData &&
+               lhs.myNodeData == rhs.myNodeData
     }
 }
 

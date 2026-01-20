@@ -104,7 +104,7 @@ struct PeerCard: View {
                 .buttonStyle(.plain)
                 .popover(isPresented: $showDetail) {
                     PeerDetailView(peer: peer)
-                        .frame(width: 300, height: 400)
+                        .frame(width: 320, height: 450)
                 }
             }
 
@@ -281,58 +281,221 @@ struct PeerDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            Text("点击条目以复制内容")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.vertical, 8)
+            
             Form {
-                Section("节点") {
-                    DetailRow(label: "主机名", value: peer.hostname)
-                    if let nid = peer.nodeId { DetailRow(label: "节点 ID", value: nid) }
-                    if let iid = peer.instanceId { DetailRow(label: "实例 ID", value: iid) }
-                    DetailRow(label: "虚拟 IP", value: peer.ipv4)
-                    DetailRow(label: "版本", value: peer.version)
-                }
-                
-                Section("连接") {
-                    DetailRow(label: "链路代价 (Cost)", value: peer.cost)
-                    DetailRow(label: "隧道类型", value: peer.tunnel)
-                    DetailRow(label: "NAT 类型", value: peer.nat)
-                    if let nh = peer.nextHopHostname { DetailRow(label: "下一跳 (Next Hop)", value: nh) }
-                    if let pl = peer.pathLen { DetailRow(label: "路径长度", value: pl) }
-                }
-                
-                Section("性能") {
-                    DetailRow(label: "延迟", value: peer.latency)
-                    DetailRow(label: "丢包率", value: peer.loss)
-                    if let nlh = peer.nextHopLatency { DetailRow(label: "下一跳延迟", value: nlh + " ms") }
-                }
-                
-                Section("流量") {
-                    DetailRow(label: "接收 (RX)", value: peer.rx)
-                    DetailRow(label: "发送 (TX)", value: peer.tx)
+                if let myNode = peer.myNodeData {
+                    localNodeSections(myNode)
+                } else if let pair = peer.fullData {
+                    remotePeerSections(pair)
+                } else {
+                    basicSections
                 }
             }
-            .formStyle(.grouped) // macOS 13+ supported, usually safe. If error, user will report. But Form by default is grouped-like.
-            // Actually, to be safer, remove .formStyle explicitly if unsure about user OS version.
-            // User context says "mac". Usually implies recent.
-            // But if I remove .formStyle, it works everywhere.
-            // I'll try .formStyle(.grouped) as it matches the intent best.
-            // Wait, previous error was '.insetGrouped' is unavailable.
-            // .formStyle matches the user need.
-            // Wait, simpler: Just Form { ... }
-            // Let's stick to Form.
+            .formStyle(.grouped)
         }
+        .frame(width: 320, height: 450)
+    }
+    
+    @ViewBuilder
+    private func localNodeSections(_ node: EasyTierStatus.NodeInfo) -> some View {
+        Section("节点") {
+            DetailRow(label: "主机名", value: node.hostname)
+            DetailRow(label: "版本", value: node.version)
+            DetailRow(label: "虚拟 IP", value: node.virtualIPv4?.description ?? "-")
+            DetailRow(label: "UDP NAT 类型", value: node.stunInfo?.udpNATType.description ?? "-")
+            DetailRow(label: "TCP NAT 类型", value: node.stunInfo?.tcpNATType.description ?? "-")
+        }
+        
+        if let listeners = node.listeners, !listeners.isEmpty {
+            Section("监听地址") {
+                ForEach(listeners.indices, id: \.self) { i in
+                    DetailRow(label: "监听 \(i+1)", value: listeners[i].url)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func remotePeerSections(_ pair: EasyTierStatus.PeerRoutePair) -> some View {
+        let route = pair.route
+        
+        Section("节点") {
+            DetailRow(label: "主机名", value: route.hostname)
+            DetailRow(label: "节点 ID", value: "\(route.peerId)", isMonospaced: true)
+            DetailRow(label: "实例 ID", value: route.instId, isMonospaced: true)
+            DetailRow(label: "版本", value: route.version)
+            DetailRow(label: "下一跳 ID", value: "\(route.nextHopPeerId)", isMonospaced: true)
+            DetailRow(label: "代价", value: "\(route.cost)")
+            DetailRow(label: "路径延迟", value: "\(route.pathLatency/1000) ms")
+            
+            if let nhLatFirst = route.nextHopPeerIdLatencyFirst {
+                DetailRow(label: "下一跳 (延迟优先)", value: "\(nhLatFirst)", isMonospaced: true)
+                DetailRow(label: "代价 (延迟优先)", value: "\(route.costLatencyFirst ?? 0)")
+                DetailRow(label: "路径延迟 (延迟优先)", value: "\((route.pathLatencyLatencyFirst ?? 0)/1000) ms")
+            }
+            
+            if let flags = route.featureFlag {
+                DetailRow(label: "特性标志", value: formatFlags(flags))
+            }
+        }
+        
+        if let pInfo = pair.peer {
+            Section("连接状态") {
+                DetailRow(label: "默认连接", value: pInfo.defaultConnId?.description ?? "-")
+            }
+            
+            ForEach(pInfo.conns.indices, id: \.self) { i in
+                let conn = pInfo.conns[i]
+                Section("连接 \(i + 1) [\(conn.tunnel?.tunnelType ?? "Unknown")]") {
+                    DetailRow(label: "角色", value: conn.isClient ? "Client" : "Server")
+                    DetailRow(label: "丢包率", value: String(format: "%.2f%%", conn.lossRate * 100))
+                    DetailRow(label: "本地地址", value: conn.tunnel?.localAddr.url ?? "-")
+                    DetailRow(label: "远程地址", value: conn.tunnel?.remoteAddr.url ?? "-")
+                    
+                    if let s = conn.stats {
+                        DetailRow(label: "接收", value: formatBytes(s.rxBytes))
+                        DetailRow(label: "发送", value: formatBytes(s.txBytes))
+                        DetailRow(label: "延迟", value: String(format: "%.1f ms", Double(s.latencyUs)/1000.0))
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var basicSections: some View {
+        Section("基础信息") {
+            DetailRow(label: "主机名", value: peer.hostname)
+            DetailRow(label: "虚拟 IP", value: peer.ipv4)
+            DetailRow(label: "版本", value: peer.version)
+        }
+        Section("网络信息") {
+            DetailRow(label: "代价", value: peer.cost)
+            DetailRow(label: "延迟", value: peer.latency + " ms")
+            DetailRow(label: "丢包率", value: peer.loss)
+            DetailRow(label: "隧道方式", value: peer.tunnel)
+        }
+    }
+    
+    private func formatFlags(_ flags: EasyTierStatus.PeerFeatureFlag) -> String {
+        var parts = [String]()
+        if flags.isPublicServer { parts.append("public_server") }
+        if flags.avoidRelayData { parts.append("avoid_relay") }
+        if flags.kcpInput { parts.append("kcp_input") }
+        if flags.noRelayKcp { parts.append("no_relay_kcp") }
+        if flags.supportConnListSync { parts.append("conn_list_sync") }
+        return parts.isEmpty ? "None" : parts.joined(separator: ", ")
+    }
+    
+    private func formatBytes(_ bytes: Int) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        let kb = Double(bytes) / 1024.0
+        if kb < 1024 { return String(format: "%.1f KB", kb) }
+        let mb = kb / 1024.0
+        if mb < 1024 { return String(format: "%.1f MB", mb) }
+        return String(format: "%.2f GB", mb / 1024.0)
     }
 }
 
 struct DetailRow: View {
     let label: String
     let value: String
+    var isMonospaced: Bool = false
     
+    @State private var isCopied = false
+
     var body: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 0) {
             Text(label)
-            Spacer()
-            Text(value)
+                .font(.system(size: 13))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
+            
+            Spacer(minLength: 8)
+            
+            Text(value.isEmpty ? "-" : value)
+                .font(isMonospaced ? .system(size: 13, weight: .regular, design: .monospaced) : .system(size: 13))
                 .foregroundColor(.secondary)
-                .textSelection(.enabled) // Allow copying
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(0)
+                .opacity(isCopied ? 0.5 : 1.0)
         }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            copyToClipboard(value)
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isCopied = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation {
+                    isCopied = false
+                }
+            }
+        }
+        .help(value)
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+    }
+}
+
+struct ScrollingTextValue: View {
+    let text: String
+    let isMonospaced: Bool
+    
+    @State private var offset: CGFloat = 0
+    @State private var isHovering = false
+    @State private var containerWidth: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .trailing) {
+                // Invisible text to measure width
+                Text(text)
+                    .font(isMonospaced ? .system(size: 13, weight: .regular, design: .monospaced) : .system(size: 13))
+                    .fixedSize(horizontal: true, vertical: false)
+                    .background(GeometryReader { textGeo in
+                        Color.clear.onAppear { textWidth = textGeo.size.width }
+                    })
+                    .opacity(0)
+
+                // Visible text
+                Text(text)
+                    .font(isMonospaced ? .system(size: 13, weight: .regular, design: .monospaced) : .system(size: 13))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .offset(x: offset)
+                    .animation(shouldAnimate ? .linear(duration: Double(textWidth / 40)).repeatForever(autoreverses: true) : .default, value: offset)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .onAppear { containerWidth = geo.size.width }
+            .onChange(of: isHovering) { hovering in
+                if hovering && textWidth > containerWidth {
+                    offset = -(textWidth - containerWidth + 10)
+                } else {
+                    offset = 0
+                }
+            }
+        }
+        .frame(height: 18)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .clipped()
+    }
+
+    private var shouldAnimate: Bool {
+        isHovering && textWidth > containerWidth
     }
 }
