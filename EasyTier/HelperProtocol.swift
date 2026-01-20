@@ -2,8 +2,26 @@ import Foundation
 
 /// XPC 协议：主应用与 Helper 之间的通信接口
 /// 注意：此协议需要在主应用和 Helper 中保持一致
+/// XPC 协议：主应用与 Helper 之间的通信接口
+/// 注意：此协议需要在主应用和 Helper 中保持一致
+/// 客户端监听协议：Helper 主动调用此协议的方法向 App 推送数据
+@objc(HelperClientListener)
+public protocol HelperClientListener {
+    /// 推送最新的运行信息（JSON 字符串）
+    func runningInfoUpdated(_ info: String)
+    
+    /// 推送最新的日志行
+    func logUpdated(_ lines: [String])
+}
+
+/// XPC 协议：主应用与 Helper 之间的通信接口
+/// 注意：此协议需要在主应用和 Helper 中保持一致
 @objc(HelperProtocol)
 public protocol HelperProtocol {
+    
+    /// 注册客户端监听器，用于双向通信
+    /// - Parameter endpoint: 客户端创建的匿名监听器端点
+    func registerListener(endpoint: NSXPCListenerEndpoint)
     
     /// 启动 easytier-core
     /// - Parameters:
@@ -45,5 +63,5 @@ public protocol HelperProtocol {
 /// Helper 的 Mach 服务名称
 public let kHelperMachServiceName = "com.alick.swiftier.helper"
 /// Helper 的目标版本号 (Helper Protocol 版本) - 升级以触发自动更新
-public let kTargetHelperVersion = "1.3.5"
+public let kTargetHelperVersion = "1.3.8"
 

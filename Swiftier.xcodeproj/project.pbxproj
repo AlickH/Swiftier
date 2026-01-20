@@ -108,29 +108,9 @@
 			path = EasyTier;
 			sourceTree = "<group>";
 		};
-		E0933DDC2F16A26200C7DE59 /* EasyTierTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = EasyTierTests;
-			sourceTree = "<group>";
-		};
-		E0933DE62F16A26200C7DE59 /* EasyTierUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = EasyTierUITests;
-			sourceTree = "<group>";
-		};
 		E0AC7EA42F18E97F00FC425C /* EasyTierHelper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = EasyTierHelper;
-			sourceTree = "<group>";
-		};
-		E0AC7EB22F18E98100FC425C /* EasyTierHelperTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = EasyTierHelperTests;
-			sourceTree = "<group>";
-		};
-		E0AC7EBC2F18E98100FC425C /* EasyTierHelperUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = EasyTierHelperUITests;
 			sourceTree = "<group>";
 		};
 		E0AC7EE22F192DD600FC425C /* EasyTierHelper */ = {
@@ -177,11 +157,7 @@
 			isa = PBXGroup;
 			children = (
 				E0933DCE2F16A25B00C7DE59 /* EasyTier */,
-				E0933DDC2F16A26200C7DE59 /* EasyTierTests */,
-				E0933DE62F16A26200C7DE59 /* EasyTierUITests */,
 				E0AC7EA42F18E97F00FC425C /* EasyTierHelper */,
-				E0AC7EB22F18E98100FC425C /* EasyTierHelperTests */,
-				E0AC7EBC2F18E98100FC425C /* EasyTierHelperUITests */,
 				E0AC7EE22F192DD600FC425C /* EasyTierHelper */,
 				E0AC7EEC2F19307C00FC425C /* Frameworks */,
 				E0933DCD2F16A25B00C7DE59 /* Products */,
@@ -248,9 +224,6 @@
 			dependencies = (
 				E0933DDB2F16A26200C7DE59 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				E0933DDC2F16A26200C7DE59 /* EasyTierTests */,
-			);
 			name = SwiftierTests;
 			packageProductDependencies = (
 			);
@@ -270,9 +243,6 @@
 			);
 			dependencies = (
 				E0933DE52F16A26200C7DE59 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				E0933DE62F16A26200C7DE59 /* EasyTierUITests */,
 			);
 			name = SwiftierUITests;
 			packageProductDependencies = (
@@ -572,7 +542,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "";
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.1.1;
 				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -613,7 +583,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "";
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.1.1;
 				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -636,7 +606,7 @@
 				DEVELOPMENT_TEAM = J33CVYBKCZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -657,7 +627,7 @@
 				DEVELOPMENT_TEAM = J33CVYBKCZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -676,7 +646,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J33CVYBKCZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -695,7 +665,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J33CVYBKCZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.EasyTierUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;

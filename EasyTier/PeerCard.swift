@@ -13,9 +13,7 @@ struct PeerCard: View {
     private func formatSpeed(_ speedStr: String) -> String {
         // If it already has units (from Table output), e.g. "10.5 KB"
         if speedStr.contains(" ") {
-            let components = speedStr.split(separator: " ")
-            guard components.count >= 2, let value = Double(components[0]) else { return speedStr }
-            return String(format: "%.2f %@", value, String(components[1]))
+            return speedStr
         }
         
         // If it is a raw number (from JSON output), e.g. "10240"
@@ -154,7 +152,8 @@ struct PeerCard: View {
                 let spacing: CGFloat = 6
                 let totalWidth = geo.size.width - (spacing * 3)
                 
-                let tTunnel = translateTunnel(peer.tunnel.isEmpty ? "-" : peer.tunnel)
+                let rawTunnel = translateTunnel(peer.tunnel.isEmpty ? "-" : peer.tunnel)
+                let tTunnel = (rawTunnel.uppercased().contains("TCP") || rawTunnel.uppercased().contains("UDP")) ? rawTunnel : "-"
                 let tNat = translateNAT(peer.nat)
                 let tCost = translateTunnel(peer.cost) // Cost column also contains p2p/local info
                 
@@ -182,14 +181,14 @@ struct PeerCard: View {
     }
     
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 10)
+        RoundedRectangle(cornerRadius: 12)
             .fill(Color(nsColor: .windowBackgroundColor).opacity(0.6)) // Match SpeedCard background
             .background(borderColor.opacity(0.05)) // Add subtle tint to match SpeedCard's visual weight
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(borderColor.opacity(0.6), lineWidth: 1) // Increased opacity for better visibility
             )
-            .clipShape(RoundedRectangle(cornerRadius: 10)) // Ensure background tint is clipped
+            .clipShape(RoundedRectangle(cornerRadius: 12)) // Ensure background tint is clipped
     }
     
     // Logic to determine border color based on Peer Type

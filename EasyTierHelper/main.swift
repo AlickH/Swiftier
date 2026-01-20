@@ -13,7 +13,7 @@ import Foundation
 let kHelperMachServiceName = "com.alick.swiftier.helper"
 
 /// Helper 版本号（用于检测是否需要升级）
-let kHelperVersion = "1.3.5"
+let kHelperVersion = "1.3.8"
 
 // MARK: - Logger
 
@@ -284,9 +284,17 @@ class CoreProcessManager {
 
 // MARK: - XPC Protocol
 
+/// 客户端监听协议：Helper 主动调用此协议的方法向 App 推送数据
+@objc(HelperClientListener)
+protocol HelperClientListener {
+    func runningInfoUpdated(_ info: String)
+    func logUpdated(_ lines: [String])
+}
+
 /// XPC 协议：主应用与 Helper 之间的通信接口
 @objc(HelperProtocol)
 protocol HelperProtocol {
+    func registerListener(endpoint: NSXPCListenerEndpoint)
     func startCore(configPath: String, corePath: String, consoleLevel: String, reply: @escaping (Bool, String?) -> Void)
     func stopCore(reply: @escaping (Bool) -> Void)
     func getCoreStatus(reply: @escaping (Int32) -> Void)
@@ -301,28 +309,81 @@ protocol HelperProtocol {
 
 class HelperDelegate: NSObject, NSXPCListenerDelegate, HelperProtocol {
     
+    // Manage client connection
+    private var clientConnection: NSXPCConnection?
+    private let clientLock = NSLock()
+    
+    // Push Loop
+    private var pushTimer: Timer?
+    private var lastPushedInfo: String?
+    
     // ... (listener implementation unchanged)
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
         log("New XPC connection from PID: \(newConnection.processIdentifier)")
         
-        // 验证连接来源（可选：添加代码签名验证）
-        
+        // 1. Helper 提供的接口
         newConnection.exportedInterface = NSXPCInterface(with: HelperProtocol.self)
         newConnection.exportedObject = self
         
-        newConnection.invalidationHandler = {
+        // 2. App 侧提供的接口（用于推送数据）
+        newConnection.remoteObjectInterface = NSXPCInterface(with: HelperClientListener.self)
+        
+        newConnection.invalidationHandler = { [weak self, weak newConnection] in
             log("XPC connection invalidated")
+            self?.clientLock.lock()
+            if self?.clientConnection == newConnection {
+                self?.clientConnection = nil
+            }
+            self?.clientLock.unlock()
         }
         
         newConnection.interruptionHandler = {
             log("XPC connection interrupted")
         }
         
+        // 保存连接用于推送
+        clientLock.lock()
+        self.clientConnection = newConnection
+        clientLock.unlock()
+        
         newConnection.resume()
+        
+        // 连接建立后启动心跳推送
+        startPushLoop()
+        
         return true
     }
     
     // MARK: - HelperProtocol Implementation
+    
+    func registerListener(endpoint: NSXPCListenerEndpoint) {
+        log("registerListener called (legacy). New architecture uses direct bi-directional connection.")
+    }
+    
+    private func startPushLoop() {
+        DispatchQueue.main.async {
+            // 防止重复启动定时器
+            if self.pushTimer?.isValid == true { return }
+            
+            self.pushTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                self?.pushUpdates()
+            }
+        }
+    }
+    
+    private func pushUpdates() {
+        guard let connection = clientConnection else { return }
+        
+        // 获取运行时信息
+        let info = EasyTierCore.shared.getRunningInfo()
+        
+        if let info = info {
+            // 通过同一个 XPC 连接将数据推回 App
+            if let proxy = connection.remoteObjectProxy as? HelperClientListener {
+                proxy.runningInfoUpdated(info)
+            }
+        }
+    }
     
     func startCore(configPath: String, corePath: String, consoleLevel: String, reply: @escaping (Bool, String?) -> Void) {
         log("XPC: startCore(configPath: \(configPath), consoleLevel: \(consoleLevel))")

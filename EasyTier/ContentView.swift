@@ -16,7 +16,6 @@ struct ContentView: View {
     @State private var showCreatePrompt = false
     @State private var showFDAOverlay = false
     @State private var newConfigName = ""
-    @State private var isWindowVisible = true // Track window visibility to pause rendering
     
     private let windowWidth: CGFloat = 420
     private let windowHeight: CGFloat = 520
@@ -26,12 +25,18 @@ struct ContentView: View {
             // 不再手动设置背景，利用 MenuBarExtra 原生窗口的 Vibrancy
             
             // 主内容层
-            VStack(spacing: 0) {
-                headerView
-                //Divider()
-                contentArea
+            if runner.isWindowVisible {
+                VStack(spacing: 0) {
+                    headerView
+                    //Divider()
+                    contentArea
+                }
+                .frame(width: windowWidth, height: windowHeight)
+            } else {
+                // 当后台运行时，仅保留最小占位，阻止 SwiftUI 大规模 Diff
+                Color.clear
+                    .frame(width: windowWidth, height: windowHeight)
             }
-            .frame(width: windowWidth, height: windowHeight)
             
             // 日志全屏覆盖层
             // 日志全屏覆盖层
@@ -94,6 +99,8 @@ struct ContentView: View {
                         Text("配置文件名:")
                         TextField("例如: my-network", text: $newConfigName)
                             .textFieldStyle(.roundedBorder)
+                            .textContentType(.none)
+                            .disableAutocorrection(true)
                             .onSubmit { createConfig() }
                         Text("将自动添加 .toml 后缀")
                             .font(.caption)
@@ -150,31 +157,13 @@ struct ContentView: View {
                 selectedConfig = configManager.configFiles.first
             }
             
-            // 同步 Core 状态，完成后根据情况决定是否自动连接
-            runner.syncWithCoreState { coreAlreadyRunning in
-                // 场景1&2: 如果 Core 已经在运行，无论自动连接是否开启，都继承状态（已在 syncWithCoreState 内处理）
-                // 场景3: 如果自动连接关闭且 Core 未运行，什么都不做
-                // 场景4: 如果自动连接关闭但 Core 已运行，UI 已更新（在 syncWithCoreState 内处理）
-                
-                // 只有当 Core 未运行 且 用户开启了自动连接 时，才自动启动
-                if !coreAlreadyRunning && UserDefaults.standard.bool(forKey: "connectOnStart") {
-                    if let path = selectedConfig?.path {
-                        print("[ContentView] Auto-Connect: Core not running, starting now...")
-                        runner.toggleService(configPath: path)
-                    }
-                } else if coreAlreadyRunning {
-                    print("[ContentView] Core already running, inheriting state")
-                } else {
-                    print("[ContentView] No auto-connect, waiting for user action")
-                }
-            }
+            // 设置窗口可见，开始动画
+            runner.isWindowVisible = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            isWindowVisible = true
+        .onDisappear {
+            runner.isWindowVisible = false
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
-            isWindowVisible = false
-        }
+        .lockVerticalScroll() // 🔒 Global Lock: Prevents the entire window container from bouncing
     }
     
     // MARK: - Header
@@ -330,99 +319,102 @@ struct ContentView: View {
         GeometryReader { geo in
             ZStack {
                 // 1) 水波纹层 (放在最底层)
-                if runner.isRunning {
-                    RippleRings(isVisible: runner.isRunning && isWindowVisible, duration: 4.0, maxScale: 5.5)
+                if runner.isRunning && runner.isWindowVisible {
+                    RippleRings(isVisible: true, duration: 4.0, maxScale: 5.5)
                         .frame(width: 500, height: 500) // Increased frame to prevent Metal clipping
                         .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
+                        .allowsHitTesting(false) // Prevent gesture interference with scrolling
                         .zIndex(0)
                 }
 
-                // 2) 节点列表区域
-                if runner.isRunning {
-                    if !runner.peers.isEmpty {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(.flexible(), spacing: 10),
-                                    GridItem(.flexible(), spacing: 10)
-                                ],
-                                spacing: 10
-                            ) {
-                                ForEach(runner.peers) { peer in
-                                    PeerCard(peer: peer)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                // 2) 节点列表区域 (Bottom Anchored)
+                if runner.isRunning && runner.isWindowVisible {
+                    VStack {
+                        Spacer()
+                        if !runner.peers.isEmpty {
+                            NativeHorizontalScroller {
+                                LazyHGrid(
+                                    rows: [
+                                        GridItem(.fixed(105), spacing: 8),
+                                        GridItem(.fixed(105), spacing: 8)
+                                    ],
+                                    spacing: 12
+                                ) {
+                                    ForEach(runner.peers) { peer in
+                                        PeerCard(peer: peer)
+                                            .frame(width: 188)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    }
                                 }
+                                .padding(.horizontal, 16)
                             }
-                            .padding(.top, 10) // Small top padding inside scroll
+                            .frame(height: 222)
+                            .padding(.bottom, 16)
+                            .zIndex(1)
+                        } else {
+                            VStack(spacing: 20) {
+                                ProgressView().scaleEffect(1.2).controlSize(.large)
+                                Text("节点加载中").font(.title3.bold()).foregroundColor(.secondary)
+                            }
+                            .frame(height: 222)
+                            .padding(.bottom, 16)
+                            .zIndex(1)
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: 10)) // Clip content at scroll boundaries
-                        .padding(.horizontal, 12) // PeerList padding is 12
-                        .padding(.top, 165) // Reduced to maximize peer list area
-                        .padding(.bottom, 12)
-                        .zIndex(1)
-                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
-                    } else {
-                        VStack(spacing: 20) {
-                            ProgressView().scaleEffect(1.2).controlSize(.large)
-                            Text("节点加载中").font(.title3.bold()).foregroundColor(.secondary)
-                        }
-                        .padding(.top, 165)
-                        .zIndex(1)
                     }
                 }
 
                 // 3) 启动按钮与网速仪表盘层
-                HStack(spacing: -6) { // Slight negative spacing for a connected but not obscuring look
-                    // Calculate unified max scale for both cards
-                    let maxSpeed = max(
-                        (runner.downloadHistory.max() ?? 10.0),
-                        (runner.uploadHistory.max() ?? 10.0)
-                    )
-                    
-                    // Download Card
-                    SpeedCard(
-                        title: "DOWNLOAD",
-                        value: runner.downloadSpeed,
-                        icon: "arrow.down.square.fill",
-                        color: .blue,
-                        history: runner.downloadHistory,
-                        maxVal: maxSpeed,
-                        isVisible: runner.isRunning && isWindowVisible
-                    )
-                    
-                    // Center Power Button
-                    Button {
-                        let path = selectedConfig?.path ?? configManager.configFiles.first?.path ?? ""
-                        runner.toggleService(configPath: path)
-                    } label: {
-                        StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
+                if runner.isWindowVisible {
+                    HStack(spacing: -6) {
+                        let maxSpeed = max(
+                            (runner.downloadHistory.max() ?? 0.0),
+                            (runner.uploadHistory.max() ?? 0.0),
+                            1_048_576.0
+                        )
+                        
+                        SpeedCard(
+                            title: "DOWNLOAD",
+                            value: runner.downloadSpeed,
+                            icon: "arrow.down.square.fill",
+                            color: .blue,
+                            history: runner.downloadHistory,
+                            maxVal: maxSpeed,
+                            isVisible: runner.isRunning && runner.isWindowVisible
+                        )
+                        
+                        Button {
+                            let path = selectedConfig?.path ?? configManager.configFiles.first?.path ?? ""
+                            runner.toggleService(configPath: path)
+                        } label: {
+                            StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
+                        }
+                        .buttonStyle(.plain)
+                        .zIndex(20)
+                        
+                        SpeedCard(
+                            title: "UPLOAD",
+                            value: runner.uploadSpeed,
+                            icon: "arrow.up.square.fill",
+                            color: .orange,
+                            history: runner.uploadHistory,
+                            maxVal: maxSpeed,
+                            isVisible: runner.isRunning && runner.isWindowVisible
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .zIndex(20)
-                    
-                    // Upload Card
-                    SpeedCard(
-                        title: "UPLOAD",
-                        value: runner.uploadSpeed,
-                        icon: "arrow.up.square.fill",
-                        color: .orange, // Changed from .green to .orange as per original content
-                        history: runner.uploadHistory,
-                        maxVal: maxSpeed,
-                        isVisible: runner.isRunning && isWindowVisible // Modified: 2. 在 SpeedCard 调用中加入 && isWindowVisible 条件。
-                    )
+                    .padding(.horizontal, 16)
+                    .frame(width: geo.size.width)
+                    .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
+                    .zIndex(10)
                 }
-                .padding(.horizontal, 12) // Match PeerList padding exactly
-                .frame(width: geo.size.width) // Use full width, padding handles inset
-                .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
-                .zIndex(10)
             }
             .animation(.spring(response: 1.0, dampingFraction: 0.8), value: runner.isRunning)
             .animation(.spring(response: 0.55, dampingFraction: 0.8), value: showLogView)
         }
     }
+
     
     private func buttonCenterY(in contentHeight: CGFloat) -> CGFloat {
-        runner.isRunning ? 105 : (contentHeight / 2) // Moved up to 105 to maximize peer list space
+        runner.isRunning ? 133 : (contentHeight / 2) // Centered between duration (Y=20) and peer cards (Y=234)
     }
     
     // MARK: - SpeedCard Component
@@ -479,28 +471,25 @@ struct ContentView: View {
                 .zIndex(1) // Above background but below sparkline path if we want sparkline on VERY top
                 
                 // Sparkline (On top layer as requested)
-                // Sparkline (On top layer as requested)
-                // Sparkline (On top layer as requested)
-                Sparkline(data: history, color: color, maxScale: maxVal, paused: !isVisible)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity) // Fills the card
-                    .zIndex(10) // Top layer
-                    .allowsHitTesting(false) // Don't block interactions
+                if isVisible {
+                    Sparkline(data: history, color: color, maxScale: maxVal, paused: !isVisible)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity) // Fills the card
+                        .zIndex(10) // Top layer
+                        .allowsHitTesting(false) // Don't block interactions
+                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: 85) // Reduced from 100 to 85 to fix crowding
             .background(
-                RoundedRectangle(cornerRadius: 10) // Match PeerCard (10)
+                RoundedRectangle(cornerRadius: 12) // Match PeerCard (12)
                     .fill(Color(nsColor: .windowBackgroundColor).opacity(0.6))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(color.opacity(0.2), lineWidth: 1)
             )
             // Removed clipShape to allow pulse ripple to extend beyond card boundary
             .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.98)
-            // Use a smoother spring for the entire card presence
-            .animation(.spring(response: 0.8, dampingFraction: 0.8), value: isVisible)
         }
     }
     
@@ -518,7 +507,7 @@ struct ContentView: View {
                 AnimatableSparkline(data: data, color: color, currentMax: maxScale, paused: paused)
                     .frame(width: geo.size.width + 60, height: geo.size.height + 60)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: maxScale)
+                    .animation(paused ? nil : .spring(response: 0.5, dampingFraction: 0.7), value: maxScale)
             }
         }
     }
@@ -542,7 +531,6 @@ struct ContentView: View {
                 if paused {
                     Color.clear
                 } else {
-                    // Limit to 24fps to balance smoothness and CPU usage (User Request)
                     TimelineView(.periodic(from: .now, by: 1.0 / 24.0)) { timeline in
                         Canvas { context, size in
                             let now = timeline.date
@@ -568,7 +556,7 @@ struct ContentView: View {
                             let stepX = innerWidth / CGFloat(data.count - 1)
                             
                             // Layout constants
-                            let strokeWidth: CGFloat = 2.5
+                            let strokeWidth: CGFloat = 3.2
                             let bottomBuffer: CGFloat = strokeWidth / 2.0 + 0.5
                             let topBuffer: CGFloat = 8.0
                             let availableHeight = h - bottomBuffer - topBuffer
@@ -593,29 +581,27 @@ struct ContentView: View {
                             let scrollOffset = (1.0 - progress) * stepX
                             
                             context.withCGContext { cgContext in
-                                var path = Path()
-                                
                                 // 4. Ghost Point (Left edge seamless fill)
                                 let firstY = points.first?.y ?? (h - bottomBuffer)
                                 let ghostValY = ghostValue.map { h - bottomBuffer - (CGFloat($0 / range) * availableHeight) }
                                 let startY = ghostValY ?? firstY
                                 
+                                var path = Path()
                                 path.move(to: CGPoint(x: -stepX, y: startY))
+
+                                // 5. Smoothed History Line (Cubic interpolation for "blunt" peaks)
+                                // Pre-shift the tip to anchor it at the far right
                                 if !points.isEmpty {
-                                    path.addLine(to: points[0])
+                                    points[points.count - 1].x -= scrollOffset
                                 }
                                 
-                                // 5. History Line
-                                for i in 1..<(points.count - 1) {
-                                    let p1 = points[i-1]
+                                for i in 0..<points.count {
+                                    let p1 = i == 0 ? CGPoint(x: -stepX, y: startY) : points[i-1]
                                     let p2 = points[i]
-                                    path.addLine(to: p2)
-                                }
-                                
-                                // 6. Anchored Tip
-                                if let lastIdx = points.indices.last {
-                                    points[lastIdx].x -= scrollOffset
-                                    path.addLine(to: points[lastIdx])
+                                    
+                                    let cp1 = CGPoint(x: p1.x + (p2.x - p1.x)/2, y: p1.y)
+                                    let cp2 = CGPoint(x: p1.x + (p2.x - p1.x)/2, y: p2.y)
+                                    path.addCurve(to: p2, control1: cp1, control2: cp2)
                                 }
                                 
                                 var fillPath = path
@@ -745,6 +731,7 @@ struct ContentView: View {
     }
 }
 
+
 // MARK: - Start/Stop Button 核心视图
 
 struct StartStopButtonCore: View {
@@ -773,7 +760,7 @@ struct StartStopButtonCore: View {
                     .frame(width: 140)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .offset(y: -85) // Rebalanced offset to match the new dashboard position
+                    .offset(y: -113) // Restored to top position (133 - 113 = 20) to match original layout while centering button below it
             }
         }
         .frame(width: 84, height: 84)
@@ -783,54 +770,51 @@ struct StartStopButtonCore: View {
 
 // MARK: - 水波纹（以按钮为中心）
 struct RippleRings: View {
-    let isVisible: Bool  // 新增：跟随按钮显示状态
+    let isVisible: Bool  
     var duration: Double = 4.0
     var maxScale: CGFloat = 5.0
-
+    
     @Environment(\.colorScheme) private var colorScheme
 
-    private var baseOpacity: Double {
-        colorScheme == .light ? 0.9 : 0.1
-    }
-
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            let phase = (t.truncatingRemainder(dividingBy: duration)) / duration
-            
-            // Calculate progress for each ring
-            let p0 = phaseShifted(phase, by: 0.0)
-            let p1 = phaseShifted(phase, by: 1.0 / 3.0)
-            let p2 = phaseShifted(phase, by: 2.0 / 3.0)
-            
-            // Sort by progress descending (Largest -> Smallest) so large rings are in back
-            let sortedProgress = [p0, p1, p2].sorted(by: >)
-
-            ZStack {
-                ForEach(sortedProgress.indices, id: \.self) { i in
-                   ring(progress: sortedProgress[i])
+        ZStack {
+            if isVisible {
+                ForEach(0..<3) { i in
+                    SingleRipple(index: i, duration: duration, maxScale: maxScale)
                 }
             }
         }
-        .opacity(isVisible ? 1.0 : 0.0)
-        .animation(.easeInOut(duration: 0.5), value: isVisible)
+        .id(colorScheme) // 确保在亮暗模式切换时，强制重新创建视图以刷新 Environment 透明度
     }
+}
 
-    // phaseShifted 和 ring 保持完全不变
-    private func phaseShifted(_ phase: Double, by shift: Double) -> Double {
-        let p = phase - shift
-        return p >= 0 ? p : (p + 1.0)
+private struct SingleRipple: View {
+    let index: Int
+    let duration: Double
+    let maxScale: CGFloat
+    
+    @State private var animate = false
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var baseOpacity: Double {
+        colorScheme == .light ? 0.9 : 0.1
     }
-
-    private func ring(progress: Double) -> some View {
-        let scale = CGFloat(progress) * (maxScale - 1.0) + 1.0 // Start from button size (scale 1.0) to maxScale
-        let opacity = baseOpacity * (1.0 - progress)
-
-        return Circle()
+    
+    var body: some View {
+        Circle()
             .fill(Color.white)
             .frame(width: 84, height: 84) // Match button size
-            .scaleEffect(scale)
-            .opacity(opacity)
+            .scaleEffect(animate ? maxScale : 1.0)
+            .opacity(animate ? 0 : baseOpacity)
+            .onAppear {
+                // 使用延时来实现环与环之间的节奏感
+                let delay = Double(index) * (duration / 3.0)
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                        animate = true
+                    }
+                }
+            }
     }
 }
 
@@ -908,6 +892,60 @@ struct FDAGuideView: View {
             
             Text(text)
                 .font(.subheadline)
+        }
+    }
+}
+
+// MARK: - Native Horizontal Scroller (Fixes SwiftUI vertical bounce bug on Mac)
+// MARK: - Native Horizontal Scroller (The Nuclear Option)
+struct NativeHorizontalScroller<Content: View>: NSViewRepresentable {
+    let content: Content
+    init(@ViewBuilder content: @escaping () -> Content) { self.content = content() }
+    
+    class HorizontalOnlyScrollView: NSScrollView {
+        override func scrollWheel(with event: NSEvent) {
+            // Logic: Swallow vertical-dominant events to prevent bounce propagation.
+            // Allow horizontal events to pass through naturally.
+            
+            if abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) {
+                // Dominantly vertical: Swallow the event.
+                // Do NOT call super. This stops scrolling AND stops bounce propagation upwards.
+            } else {
+                // Dominantly horizontal (or zero/stationary): Pass it to the scroll view to handle.
+                super.scrollWheel(with: event)
+            }
+        }
+    }
+    
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroller = HorizontalOnlyScrollView() // Use our subclass
+        scroller.hasHorizontalScroller = false
+        scroller.hasVerticalScroller = false
+        scroller.drawsBackground = false
+        scroller.autohidesScrollers = true
+        scroller.horizontalScrollElasticity = .allowed
+        scroller.verticalScrollElasticity = .none // The Holy Grail
+        
+        let hostingView = NSHostingView(rootView: content)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        scroller.documentView = hostingView
+        
+        if let doc = scroller.documentView {
+            // 🚫 CRITICAL FIX: Only anchor Top and Left. 
+            // Do NOT anchor Bottom. This allows content (218pt) to be smaller than View (222pt).
+            // When content < viewport, macOS physically cannot rubber-band vertically.
+            doc.topAnchor.constraint(equalTo: scroller.contentView.topAnchor).isActive = true
+            doc.leadingAnchor.constraint(equalTo: scroller.contentView.leadingAnchor).isActive = true
+            // We DO need to ensure the hosting view takes its own intrinsic size
+        }
+        return scroller
+    }
+    
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        if let host = nsView.documentView as? NSHostingView<Content> {
+            host.rootView = content
+            host.frame.size = host.fittingSize // 218pt
+            // Height is NOT moved or stretched. It floats freely.
         }
     }
 }

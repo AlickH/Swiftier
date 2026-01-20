@@ -5,7 +5,6 @@ import WebKit
 struct SettingsView: View {
     @Binding var isPresented: Bool
     
-    @AppStorage("refreshInterval") private var refreshInterval: Double = 1.0
     @AppStorage("connectOnStart") private var connectOnStart: Bool = true
     @AppStorage("breathEffect") private var breathEffect: Bool = true
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
@@ -82,14 +81,6 @@ struct SettingsView: View {
                     
                     Toggle("自动更新", isOn: $appAutoUpdate)
                     Toggle("接收 Beta 版本", isOn: $appBetaChannel)
-                    
-                    HStack {
-                        Text("状态刷新间隔")
-                        Spacer()
-                        Text("\(refreshInterval, specifier: "%.1f") s")
-                            .foregroundColor(.secondary)
-                        Stepper("", value: $refreshInterval, in: 0.5...10.0, step: 0.5).labelsHidden()
-                    }
                     
                     Toggle("启动 APP 时自动连接", isOn: $connectOnStart)
                     Toggle("连接时图标呼吸闪烁", isOn: $breathEffect)

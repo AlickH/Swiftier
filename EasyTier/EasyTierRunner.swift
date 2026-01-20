@@ -11,6 +11,7 @@ final class EasyTierRunner: ObservableObject {
     @Published var peerCount: String = "0"
     @Published var downloadSpeed: String = "0 KB/s"
     @Published var uploadSpeed: String = "0 KB/s"
+    @Published var isWindowVisible = true // 新增：全局追踪窗口可见性，优化后台 CPU
 
     @Published var uptimeText: String = "00:00:00"
     
@@ -27,6 +28,28 @@ final class EasyTierRunner: ObservableObject {
     private var lastTotalTx: Int = 0
     private var lastPollTime: Date?
     
+    // Peer-level speed tracking
+    private var lastPeerStats: [Int: (rx: Int, tx: Int, time: Date)] = [:]
+    private let jsonDecoder = JSONDecoder()
+    
+    // 最小化解码结构，用于后台静默模式以极速解析字节数
+    private struct MinimalStatus: Codable {
+        struct Pair: Codable {
+            struct Peer: Codable {
+                struct Conn: Codable {
+                    struct Stats: Codable {
+                        let rx_bytes: Int
+                        let tx_bytes: Int
+                    }
+                    let stats: Stats?
+                }
+                let conns: [Conn]?
+            }
+            let peer: Peer?
+        }
+        let peer_route_pairs: [Pair]?
+    }
+    
     @Published var virtualIP: String = "-"
     
     // Speed history for graphs
@@ -38,10 +61,9 @@ final class EasyTierRunner: ObservableObject {
         syncWithCoreState()
     }
     
-    /// 同步 UI 状态与后台 Core 的真实状态
-    /// - Parameter completion: 完成回调，参数表示是否检测到 Core 在运行
     func syncWithCoreState(completion: ((Bool) -> Void)? = nil) {
-        print("[Runner] Syncing with core state...")
+        let wasAlreadyRunning = self.isRunning
+        print("[Runner] Syncing with core state (current: \(wasAlreadyRunning))...")
         
         CoreService.shared.getStatus { [weak self] running, pid in
             guard let self = self else { 
@@ -49,59 +71,80 @@ final class EasyTierRunner: ObservableObject {
                 return 
             }
             
-            if running && pid > 0 {
+            let isDiscovery = running && pid > 0
+            
+            if isDiscovery {
                 // Core 正在后台运行，获取真实启动时间
                 if #available(macOS 13.0, *) {
-                    HelperManager.shared.getCoreStartTime { timestamp in
+                    HelperManager.shared.getCoreStartTime { [weak self] timestamp in
+                        guard let self = self else { return }
                         DispatchQueue.main.async {
-                            self.isRunning = true
+                            // 只有状态改变才触发 UI 更新，防止循环刷新
+                            if !self.isRunning {
+                                self.isRunning = true
+                            }
                             
                             if timestamp > 0 {
-                                // 使用 Helper 返回的真实启动时间
                                 self.startedAt = Date(timeIntervalSince1970: timestamp)
-                            } else {
-                                // 没有记录，假设刚刚启动
+                            } else if self.startedAt == nil {
                                 self.startedAt = Date()
                             }
                             
-                            self.currentSessionID = UUID()
-                            self.resetSpeedCounters()
-                            self.startUptimeTimer()
-                            self.startMonitoring()
+                            // 只有在之前认定为停止的情况下，才重新初始化监控逻辑
+                            if !wasAlreadyRunning {
+                                print("[Runner] Inheriting running core state, initializing monitoring...")
+                                self.currentSessionID = UUID()
+                                self.resetSpeedCounters()
+                                self.startUptimeTimer()
+                                self.startMonitoring()
+                            }
                             
-                            print("[Runner] Core is already running (PID: \(pid)), syncing UI state")
+                            print("[Runner] Core detected (PID: \(pid)). Sync complete.")
                             completion?(true)
                         }
                     }
                 } else {
-                    // 旧系统 fallback (其实已经不再需要，因为 target >= 13.0)
+                    // 旧系统 fallback
                     DispatchQueue.main.async {
-                        self.isRunning = true
-                        self.startedAt = Date()
-                        self.currentSessionID = UUID()
-                        self.startUptimeTimer()
-                        self.startMonitoring()
+                        if !self.isRunning { self.isRunning = true }
+                        if !wasAlreadyRunning {
+                            self.startedAt = Date()
+                            self.currentSessionID = UUID()
+                            self.startUptimeTimer()
+                            self.startMonitoring()
+                        }
                         completion?(true)
                     }
                 }
             } else {
                 // Core 未运行
                 DispatchQueue.main.async {
-                    self.isRunning = false
+                    if self.isRunning {
+                        self.isRunning = false
+                    }
                     self.startedAt = nil
+                    
+                    // 自动连接逻辑：仅在 App 刚启动、且发现 Core 未跑、且开启了开关时触发一次
+                    if !wasAlreadyRunning && UserDefaults.standard.bool(forKey: "connectOnStart") {
+                        print("[Runner] Initial sync: Core not running, auto-connecting...")
+                        if let lastConfig = ConfigManager.shared.configFiles.first?.path {
+                             self.toggleService(configPath: lastConfig)
+                        }
+                    }
+                    
                     self.uptimeText = "00:00:00"
                     self.peers = []
                     self.downloadHistory = Array(repeating: 0.0, count: 20)
                     self.uploadHistory = Array(repeating: 0.0, count: 20)
-                    print("[Runner] No Core process detected via Helper")
+                    if wasAlreadyRunning {
+                        print("[Runner] Core process disappeared.")
+                    }
                     completion?(false)
                 }
             }
         }
     }
     
-    // checkCoreProcessDirectly removed as it's not applicable for embedded core
-
     // --- 保留功能：磁盘访问权限检查 ---
     var hasFullDiskAccess: Bool {
         let path = "/Library/Application Support/com.apple.TCC/TCC.db"
@@ -124,15 +167,12 @@ final class EasyTierRunner: ObservableObject {
         }
     }
 
-    // Prevent race conditions during rapid toggles
     @Published var isProcessing = false
 
     func toggleService(configPath: String) {
         if isProcessing { return }
         isProcessing = true
         
-        // Optimistic UI Update: React immediately to user input
-        // Toggle the state instantly so the button responds visually
         let targetState = !isRunning
         
         withAnimation(.spring(response: 1.0, dampingFraction: 0.8)) {
@@ -141,23 +181,19 @@ final class EasyTierRunner: ObservableObject {
         }
         
         if !targetState {
-            // >>> User requested STOP
+            // STOP
             self.startedAt = nil
             self.uptimeText = "00:00:00"
             self.uptimeTimer?.cancel()
             self.timer?.cancel()
-            // peers cleared above
             
             CoreService.shared.stop { [weak self] _ in
-                DispatchQueue.main.async {
-                    // Critical: Hold the lock for a safety buffer to allow OS to release ports/processes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        self?.isProcessing = false
-                    }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self?.isProcessing = false
                 }
             }
         } else {
-            // >>> User requested START
+            // START
             self.startedAt = Date()
             self.uptimeText = "00:00:00"
             self.startUptimeTimer()
@@ -166,13 +202,9 @@ final class EasyTierRunner: ObservableObject {
             self.currentSessionID = newSessionID
             self.lastConfigPath = configPath
             
-            // Strategy: Enforce a clean slate.
-            // Even if we think it's stopped, we force a stop command to Helper to ensure
-            // any zombie processes or occupied ports are cleared.
             print("[Runner] Optimistic start. Background cleanup initiated...")
             
             CoreService.shared.stop { [weak self] _ in
-                // Give the system ample time (1.5s) to reclaim resources (ports, file handles)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     self?.performStart(configPath: configPath, newSessionID: newSessionID)
                 }
@@ -194,88 +226,31 @@ final class EasyTierRunner: ObservableObject {
                     self.startMonitoring()
                     self.isProcessing = false
                 } else {
-                    // Retry logic
                     if retryCount > 0 {
                         print("[Runner] Start failed, retrying in 1.5s...")
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             self.performStart(configPath: configPath, newSessionID: newSessionID, retryCount: retryCount - 1)
                         }
                     } else {
-                        // Final fallback check
-                        CoreService.shared.getStatus { running, _ in
-                            DispatchQueue.main.async {
-                                if running {
-                                    self.isRunning = true
-                                    self.startedAt = Date()
-                                    self.startUptimeTimer()
-                                    self.startMonitoring()
-                                } else {
-                                    self.isRunning = false
-                                }
-                                self.isProcessing = false
-                            }
-                        }
+                        self.isProcessing = false
+                        self.syncWithCoreState()
                     }
                 }
             }
         }
     }
     
-
-    /// Wait until the Core process is confirmed dead
-    private func waitForCoreCleanup(timeout: TimeInterval = 3.0, completion: @escaping (Bool) -> Void) {
-        // ... (Keep existing implementation if needed by other methods, or remove if unused)
-        // Since we are forcing stop now, this might be less critical but good for debugging tools.
-        let startTime = Date()
-        func check() {
-            CoreService.shared.getStatus { running, pid in
-                if !running { completion(true) }
-                else {
-                    if Date().timeIntervalSince(startTime) > timeout { completion(false) }
-                    else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { check() } }
-                }
-            }
-        }
-        check()
-    }
-
     func restartService() {
         guard let path = lastConfigPath, isRunning else { return }
         if isProcessing { return }
         isProcessing = true
         
-        // 1. Stop
         CoreService.shared.stop { [weak self] _ in
-            DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 guard let self = self else { return }
-                self.isRunning = false
-                self.uptimeTimer?.cancel()
-                self.timer?.cancel()
-                self.peers = []
-                
-                // 2. Wait a bit for port release (safety buffer)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    // 3. Start
-                    let newSessionID = UUID()
-                    self.currentSessionID = newSessionID
-                    
-                    CoreService.shared.start(configPath: path) { success in
-                        DispatchQueue.main.async {
-                            if success {
-                                self.isRunning = true
-                                self.startedAt = Date()
-                                self.startUptimeTimer()
-                                
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                    guard self.isRunning,
-                                          self.currentSessionID == newSessionID else { return }
-                                    self.startMonitoring()
-                                }
-                            }
-                            self.isProcessing = false
-                        }
-                    }
-                }
+                let newSessionID = UUID()
+                self.currentSessionID = newSessionID
+                self.performStart(configPath: path, newSessionID: newSessionID)
             }
         }
     }
@@ -288,224 +263,175 @@ final class EasyTierRunner: ObservableObject {
     }
 
     private func startMonitoring() {
-        // OPTIMIZATION: Do NOT start LogParser file monitoring here.
-        // LogParser.shared.startMonitoring() reads the log file every second, consuming high CPU.
-        // Events are already fetched via getRunningInfo RPC in refreshPeersOnce.
-        // File monitoring should only be active when LogView is visible (handled in LogView.swift).
-        
         resetSpeedCounters()
-        
         timer?.cancel()
         
-        let interval = UserDefaults.standard.double(forKey: "refreshInterval")
-        let finalInterval = interval > 0 ? interval : 2.0
-        
-        timer = Timer.publish(every: finalInterval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.refreshPeersOnce()
+        if #available(macOS 13.0, *) {
+            HelperManager.shared.setPushHandler { [weak self] jsonStr in
+                self?.processRunningInfo(jsonStr)
             }
+            refreshPeersOnce()
+        } else {
+             // Fallback for older macOS (Timer based)
+             timer = Timer.publish(every: 1.0, on: .main, in: .common)
+                 .autoconnect()
+                 .sink { [weak self] _ in
+                     self?.refreshPeersOnce()
+                 }
+        }
     }
     
     private func resetSpeedCounters() {
         lastTotalRx = 0
         lastTotalTx = 0
         lastPollTime = nil
+        lastPeerStats = [:]
         downloadHistory = Array(repeating: 0.0, count: 20)
         uploadHistory = Array(repeating: 0.0, count: 20)
     }
 
     private func refreshPeersOnce() {
         guard #available(macOS 13.0, *) else { return }
-        
         HelperManager.shared.getRunningInfo { [weak self] jsonStr in
-            guard let self = self, let jsonStr = jsonStr else { return }
+             if let str = jsonStr {
+                 self?.processRunningInfo(str)
+             }
+        }
+    }
+
+    private func processRunningInfo(_ jsonStr: String) {
+        let now = Date()
+        guard let data = jsonStr.data(using: .utf8) else { return }
+        
+        var totalRx = 0
+        var totalTx = 0
+        var fetchedPeers: [PeerInfo] = []
+        
+        if !isWindowVisible {
+            // --- 静默模式：极致性能，仅解析字节数用于图表连贯性 ---
+            if let mini = try? jsonDecoder.decode(MinimalStatus.self, from: data), let pairs = mini.peer_route_pairs {
+                for pair in pairs {
+                    if let conns = pair.peer?.conns {
+                        for conn in conns {
+                            if let s = conn.stats {
+                                totalRx += s.rx_bytes
+                                totalTx += s.tx_bytes
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // --- 活跃模式：全量解析并更新 UI ---
+            guard let status = try? jsonDecoder.decode(EasyTierStatus.self, from: data) else { return }
             
-            guard let data = jsonStr.data(using: .utf8) else { return }
-            
-            // Decode using the new model
-            guard let status = try? JSONDecoder().decode(EasyTierStatus.self, from: data) else {
-                print("Failed to decode EasyTierStatus")
-                return
+            // 1. IP & 事件更新 (不直接触发 UI 刷新)
+            LogParser.shared.updateEventsFromRunningInfo(status.events)
+            if let myIp = status.myNodeInfo?.virtualIPv4?.description, self.virtualIP != myIp {
+                DispatchQueue.main.async { self.virtualIP = myIp }
             }
             
-            // 1. Update Events
-            LogParser.shared.updateEventsFromRunningInfo(status.events)
+            // 2. 统计流量 & 构建节点列表
+            for pair in status.peerRoutePairs {
+                if let peer = pair.peer {
+                    for conn in peer.conns {
+                        if let stats = conn.stats {
+                            totalRx += stats.rxBytes
+                            totalTx += stats.txBytes
+                        }
+                    }
+                }
+            }
             
-            // 2. Update Peers
-            var fetchedPeers: [PeerInfo] = []
-            
-            // Add Local Node as a card (per USER preference)
+            // 3. 构建本地节点卡片
             if let myNode = status.myNodeInfo {
-                let localPeer = PeerInfo(
+                fetchedPeers.append(PeerInfo(
                     sessionID: self.currentSessionID,
-                    ipv4: "\(myNode.virtualIPv4?.description ?? "-") (Local)",
+                    ipv4: myNode.virtualIPv4?.description ?? "-",
                     hostname: myNode.hostname,
                     cost: "本机",
                     latency: "0",
                     loss: "0.0%",
-                    rx: "-",
-                    tx: "-",
+                    rx: self.formatBytes(totalRx),
+                    tx: self.formatBytes(totalTx),
                     tunnel: "LOCAL",
                     nat: self.natTypeString(myNode.stunInfo?.udpNATType ?? 0),
                     version: myNode.version
-                )
-                fetchedPeers.append(localPeer)
+                ))
             }
             
+            // 4. 构建远程节点列表
             for pair in status.peerRoutePairs {
-                // ... (rest of peer loop unchanged)
-                // Route Info
-                let ipv4 = pair.route.ipv4Addr?.description ?? ""
-                let hostname = pair.route.hostname
-                let costStr = pair.route.cost == 1 ? "P2P" : "Relay(\(pair.route.cost))"
-                let version = pair.route.version
-                
-                // Aggregation Vars
-                var latencyVal = ""
-                var lossVal = ""
-                var rxVal = ""
-                var txVal = ""
-                var tunnelVal = ""
+                let peerId = pair.route.peerId
+                var rxVal = "0 B", txVal = "0 B", latencyVal = "", lossVal = "", tunnelVal = ""
                 
                 if let peer = pair.peer {
-                    var totalRx = 0
-                    var totalTx = 0
-                    var latencySum = 0
-                    var latencyCount = 0
-                    var lossSum = 0.0
-                    var lossCount = 0
-                    var tunnelTypes: Set<String> = []
-                    
+                    var cRx = 0, cTx = 0, latSum = 0, latCount = 0, lossSum = 0.0, lossCount = 0, tunnels = Set<String>()
                     for conn in peer.conns {
-                        // Stats
-                        if let stats = conn.stats {
-                            latencySum += stats.latencyUs
-                            latencyCount += 1
-                            totalRx += stats.rxBytes
-                            totalTx += stats.txBytes
-                        }
-                        
-                        // Loss
-                        lossSum += conn.lossRate
-                        lossCount += 1
-                        
-                        // Tunnel
-                        if let type = conn.tunnel?.tunnelType {
-                            tunnelTypes.insert(type.uppercased())
-                        }
+                        if let s = conn.stats { latSum += s.latencyUs; latCount += 1; cRx += s.rxBytes; cTx += s.txBytes }
+                        lossSum += conn.lossRate; lossCount += 1
+                        if let t = conn.tunnel?.tunnelType { tunnels.insert(t.uppercased()) }
                     }
-                    
-                    // Averages & Formatting
-                    if latencyCount > 0 {
-                        let avgLatencyMs = Double(latencySum) / Double(latencyCount) / 1000.0
-                        latencyVal = String(format: "%.1f", avgLatencyMs)
-                    } else if let pathLat = pair.route.pathLatency, pathLat > 0 {
-                         latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
-                    }
-                    
-                    if lossCount > 0 {
-                        let avgLoss = lossSum / Double(lossCount)
-                        lossVal = String(format: "%.1f%%", avgLoss * 100)
-                    }
-                    
-                    rxVal = self.formatBytes(totalRx)
-                    txVal = self.formatBytes(totalTx)
-                    tunnelVal = tunnelTypes.sorted().joined(separator: "&")
-                } else {
-                     // No direct connection, use route info if available
-                    if let pathLat = pair.route.pathLatency, pathLat > 0 {
-                         latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
-                    }
+                    rxVal = formatBytes(cRx); txVal = formatBytes(cTx)
+                    if latCount > 0 { latencyVal = String(format: "%.1f", Double(latSum)/Double(latCount)/1000.0) }
+                    if lossCount > 0 { lossVal = String(format: "%.1f%%", (lossSum/Double(lossCount))*100.0) }
+                    tunnelVal = tunnels.sorted().joined(separator: "&")
+                } else if let pathLat = pair.route.pathLatency, pathLat > 0 {
+                    latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
                 }
                 
-                // NAT Type
-                var natVal = ""
-                if let natType = pair.route.stunInfo?.udpNATType {
-                    natVal = self.natTypeString(natType)
-                }
-                
-                let peerInfo = PeerInfo(
+                fetchedPeers.append(PeerInfo(
                     sessionID: self.currentSessionID,
-                    ipv4: ipv4,
-                    hostname: hostname,
-                    cost: costStr,
-                    latency: latencyVal,
-                    loss: lossVal,
-                    rx: rxVal,
-                    tx: txVal,
-                    tunnel: tunnelVal,
-                    nat: natVal,
-                    version: version
-                )
-                fetchedPeers.append(peerInfo)
+                    ipv4: pair.route.ipv4Addr?.description ?? "",
+                    hostname: pair.route.hostname,
+                    cost: pair.route.cost == 1 ? "P2P" : "Relay(\(pair.route.cost))",
+                    latency: latencyVal, loss: lossVal, rx: rxVal, tx: txVal, tunnel: tunnelVal,
+                    nat: natTypeString(pair.route.stunInfo?.udpNATType ?? 0),
+                    version: pair.route.version
+                ))
             }
-            
-            // 3. Update Speeds
-            let now = Date()
-            var totalRx = 0
-            var totalTx = 0
-            
-            for pair in status.peerRoutePairs {
-                if let peer = pair.peer {
-                    for conn in peer.conns {
-                        if let stats = conn.stats {
-                            totalRx += stats.rxBytes
-                            totalTx += stats.txBytes
-                        }
+        }
+        
+        // --- 全局流量更新 (无论可见性，保证历史图表平滑) ---
+        if let lastT = lastPollTime {
+            let d = now.timeIntervalSince(lastT)
+            if d > 0.1 {
+                let rSpeed = max(0, Double(totalRx - lastTotalRx) / d)
+                let tSpeed = max(0, Double(totalTx - lastTotalTx) / d)
+                DispatchQueue.main.async {
+                    if self.isWindowVisible {
+                        self.downloadSpeed = self.formatSpeed(rSpeed)
+                        self.uploadSpeed = self.formatSpeed(tSpeed)
                     }
+                    self.downloadHistory.removeFirst(); self.downloadHistory.append(rSpeed)
+                    self.uploadHistory.removeFirst(); self.uploadHistory.append(tSpeed)
                 }
             }
+        }
+        self.lastTotalRx = totalRx
+        self.lastTotalTx = totalTx
+        self.lastPollTime = now
+        
+        // --- 性能分支：如果不可见，到此为止 ---
+        guard isWindowVisible else { return }
+        
+        // 5. 排序并发布 UI 列表
+        let sorted = fetchedPeers.sorted { p1, p2 in
+            // 优先级 1: 本机始终第一
+            let is1L = p1.cost == "本机"; let is2L = p2.cost == "本机"
+            if is1L != is2L { return is1L }
             
-            if let lastTime = self.lastPollTime, let lastRx = Optional(self.lastTotalRx), let lastTx = Optional(self.lastTotalTx) {
-                let duration = now.timeIntervalSince(lastTime)
-                if duration > 0 {
-                    let rxSpeed = Double(totalRx - lastRx) / duration
-                    let txSpeed = Double(totalTx - lastTx) / duration
-                    
-                    DispatchQueue.main.async {
-                        self.downloadSpeed = "\(self.formatSpeed(rxSpeed))"
-                        self.uploadSpeed = "\(self.formatSpeed(txSpeed))"
-                        
-                        // Update history
-                        self.downloadHistory.append(rxSpeed)
-                        if self.downloadHistory.count > 20 { self.downloadHistory.removeFirst() }
-                        
-                        self.uploadHistory.append(txSpeed)
-                        if self.uploadHistory.count > 20 { self.uploadHistory.removeFirst() }
-                    }
-                }
-            }
+            // 优先级 2: 有虚拟 IP 的排前面，Public (IP 为空) 的排后面
+            let is1Empty = p1.ipv4.isEmpty; let is2Empty = p2.ipv4.isEmpty
+            if is1Empty != is2Empty { return !is1Empty }
             
-            self.lastTotalRx = totalRx
-            self.lastTotalTx = totalTx
-            self.lastPollTime = now
-            
-            // 4. Update Node Info (Global state for speeds, but card handles IP)
-            if let myIp = status.myNodeInfo?.virtualIPv4?.description {
-                DispatchQueue.main.async { self.virtualIP = myIp }
-            }
-            
-            let sortedPeers = fetchedPeers.sorted { p1, p2 in
-                // Original Rule: Local first, then IP sorted, Public at the end
-                let isP1Local = p1.ipv4.contains("Local")
-                let isP2Local = p2.ipv4.contains("Local")
-                if isP1Local != isP2Local { return isP1Local }
-                
-                // Public nodes have empty IP or "Public" in hostname/IP
-                let isP1Public = p1.ipv4.isEmpty || p1.ipv4.contains("Public") || p1.hostname.lowercased().contains("public")
-                let isP2Public = p2.ipv4.isEmpty || p2.ipv4.contains("Public") || p2.hostname.lowercased().contains("public")
-                if isP1Public != isP2Public { return !isP1Public }
-                
-                return p1.ipv4.localizedStandardCompare(p2.ipv4) == .orderedAscending
-            }
-            
-            DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
-                    self.peers = sortedPeers
-                }
-                self.peerCount = "\(sortedPeers.count)"
-            }
+            // 优先级 3: 正常的按 IP 排序
+            return p1.ipv4.localizedStandardCompare(p2.ipv4) == .orderedAscending
+        }
+        
+        DispatchQueue.main.async {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) { self.peers = sorted }
+            self.peerCount = "\(sorted.count)"
         }
     }
     
@@ -516,19 +442,12 @@ final class EasyTierRunner: ObservableObject {
         let mb = kb / 1024.0
         return String(format: "%.1f MB/s", mb)
     }
-
     
     private func natTypeString(_ type: Int) -> String {
         switch type {
-        case 1: return "Open"
-        case 2: return "NoPAT"
-        case 3: return "FullCone"
-        case 4: return "Restricted"
-        case 5: return "PortRestricted"
-        case 6: return "Symmetric"
-        case 7: return "SymUDPFirewall"
-        case 8, 9: return "SymEasy"
-        default: return "Unknown"
+        case 1: return "Open"; case 2: return "NoPAT"; case 3: return "FullCone"; case 4: return "Restricted"
+        case 5: return "PortRestricted"; case 6: return "Symmetric"; case 7: return "SymUDPFirewall"
+        case 8, 9: return "SymEasy"; default: return "Unknown"
         }
     }
     
@@ -538,21 +457,18 @@ final class EasyTierRunner: ObservableObject {
         if kb < 1024 { return String(format: "%.1f KB", kb) }
         let mb = kb / 1024.0
         if mb < 1024 { return String(format: "%.1f MB", mb) }
-        let gb = mb / 1024.0
-        return String(format: "%.2f GB", gb)
+        return String(format: "%.2f GB", mb / 1024.0)
     }
 
     private func startUptimeTimer() {
-        uptimeTimer?.cancel()
         uptimeTimer = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                guard let self = self, let startedAt = self.startedAt else { return }
-                let interval = Int(Date().timeIntervalSince(startedAt))
-                let h = interval / 3600
-                let m = (interval % 3600) / 60
-                let s = interval % 60
-                self.uptimeText = String(format: "%02d:%02d:%02d", h, m, s)
-            }
+                guard let self = self, self.isWindowVisible, let sAt = self.startedAt else { return }
+                let interval = Int(Date().timeIntervalSince(sAt))
+                let h = interval / 3600; let m = (interval % 3600) / 60; let s = interval % 60
+                let newText = String(format: "%02d:%02d:%02d", h, m, s)
+                if self.uptimeText != newText { self.uptimeText = newText }
+        }
     }
 }

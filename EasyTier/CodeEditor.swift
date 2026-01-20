@@ -96,7 +96,17 @@ struct CodeEditor: NSViewRepresentable {
         textView.textColor = .labelColor // 自适应文字颜色
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.isEditable = isEditable
-
+        textView.textContainerInset = NSSize(width: 12, height: 12)
+        
+        // Disable all automatic text systems to prevent 'autofill' and other background processes
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.isAutomaticDataDetectionEnabled = false
+        textView.isContinuousSpellCheckingEnabled = false
+        textView.isGrammarCheckingEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         
         // 关键设置：容器自动调整

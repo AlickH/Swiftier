@@ -68,9 +68,9 @@ struct EventEntry: Identifiable, Equatable, Codable {
             switch self {
             case .peerAdded, .peerConnAdded, .connected, .tunDeviceReady, .listenerAdded: return .green
             case .peerRemoved, .connectError: return .red
-            case .connecting, .handshake: return .blue
+            case .connecting, .handshake: return .yellow
             case .routeChanged: return .orange
-            case .unknown: return .primary
+            case .unknown: return .yellow
             }
         }
     }
@@ -159,12 +159,14 @@ struct LogView: View {
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .textContentType(.none)
+        .disableAutocorrection(true)
         .compositingGroup()
         .shadow(radius: 16)
         .task {
-            // Delay log loading until the slide-up animation completes (0.55s).
+            // Delay log loading until the slide-up animation completes (0.4s).
             // This prevents "content flashing before background" artifacts and reduces animation hitching.
-            try? await Task.sleep(nanoseconds: 550_000_000)
+            try? await Task.sleep(nanoseconds: 400_000_000)
             logParser.startMonitoring()
         }
         .onDisappear {
@@ -179,6 +181,9 @@ class LogParser: ObservableObject {
     
     @Published var logs: [LogEntry] = []
     @Published var events: [EventEntry] = []
+    
+    var isPaused = false
+    private var pendingLogs: [LogEntry] = []
     
     // Persistence
     private var eventsFileURL: URL {
@@ -221,6 +226,7 @@ class LogParser: ObservableObject {
     private let logPath = "/var/log/swiftier-helper.log"
     private var isReading = false
     private var lastReadOffset: UInt64 = 0
+    private var trailingRemainder = "" // Buffer for partial lines at the end of a chunk
     
     private let maxFullTextLength = 20000 // 20KB per entry max
     private let maxLogItems = 1000 // Increased to prevent UI jumping when scrolling (removing items causes shift)
@@ -251,8 +257,8 @@ class LogParser: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.events.append(contentsOf: newEvents)
-            // Sort by date (newest first) and limit
-            self.events.sort { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            // Sort by date (oldest first) so newest is at the end, consistent with log append logic
+            self.events.sort { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
             if self.events.count > self.maxEventItems {
                 self.events = Array(self.events.prefix(self.maxEventItems))
             }
@@ -331,25 +337,36 @@ class LogParser: ObservableObject {
                 let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: self.logPath))
                 let endOffset = handle.seekToEndOfFile()
                 
-                // If we have a valid previous offset, continue from there to catch missed events
-                if self.lastReadOffset > 0 && self.lastReadOffset <= endOffset {
-                    try handle.seek(toOffset: self.lastReadOffset)
-                } else {
-                    // Read larger history (2MB) on fresh start to catch historical events
-                    // Check for underflow before subtracting
-                    let readSize: UInt64 = 2 * 1024 * 1024
-                    let startOffset = (endOffset > readSize) ? (endOffset - readSize) : 0
-                    try handle.seek(toOffset: startOffset)
-                }
+                // Always read larger history (2MB) on fresh start to catch historical events
+                // This ensures the list isn't empty if the previous offset was at the very end
+                let readSize: UInt64 = 2 * 1024 * 1024
+                let startOffset = (endOffset > readSize) ? (endOffset - readSize) : 0
+                try handle.seek(toOffset: startOffset)
                 
                 let data = handle.readDataToEndOfFile()
                 if let chunk = String(data: data, encoding: .utf8) {
-                    let results = self.processChunkInBackground(chunk)
-                    DispatchQueue.main.async { [weak self] in
-                        self?.applyResults(results)
-                        self?.fileHandle = handle
-                        self?.timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                            self?.readNewData()
+                    // Prepend remainder (though usually 0 on start) and find the last newline
+                    let fullContent = self.trailingRemainder + chunk
+                    if let lastNewline = fullContent.lastIndex(of: "\n") {
+                        let toProcess = String(fullContent[..<lastNewline])
+                        self.trailingRemainder = String(fullContent[fullContent.index(after: lastNewline)...])
+                        
+                        let results = self.processChunkInBackground(toProcess)
+                        DispatchQueue.main.async { [weak self] in
+                            self?.applyResults(results)
+                            self?.fileHandle = handle
+                            self?.timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                                self?.readNewData()
+                            }
+                        }
+                    } else {
+                        // No newline found yet, keep buffering
+                        self.trailingRemainder = fullContent
+                        DispatchQueue.main.async { [weak self] in
+                            self?.fileHandle = handle
+                            self?.timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                                self?.readNewData()
+                            }
                         }
                     }
                 }
@@ -479,6 +496,16 @@ class LogParser: ObservableObject {
         saveEvents()
         logs.removeAll()
         events.removeAll()
+        pendingLogs.removeAll()
+    }
+    
+    func flushPending() {
+        guard !pendingLogs.isEmpty else { return }
+        self.logs.append(contentsOf: pendingLogs)
+        if self.logs.count > maxLogItems {
+            self.logs.removeFirst(self.logs.count - maxLogItems)
+        }
+        pendingLogs.removeAll()
     }
     
     func readNewData() {
@@ -491,7 +518,6 @@ class LogParser: ObservableObject {
                 return 
             }
             
-            // Limit read to 1MB per tick to prevent spikes
             let data = handle.readData(ofLength: 1024 * 1024)
             if data.isEmpty {
                 DispatchQueue.main.async { self.isReading = false }
@@ -499,10 +525,23 @@ class LogParser: ObservableObject {
             }
             
             if let chunk = String(data: data, encoding: .utf8) {
-                let results = self.processChunkInBackground(chunk)
-                DispatchQueue.main.async { [weak self] in
-                    self?.applyResults(results)
-                    self?.isReading = false
+                // Combine with remainder from previous read
+                let fullContent = self.trailingRemainder + chunk
+                
+                // Only process up to the last visible newline to avoid cutting log lines in half
+                if let lastNewline = fullContent.lastIndex(of: "\n") {
+                    let toProcess = String(fullContent[..<lastNewline])
+                    self.trailingRemainder = String(fullContent[fullContent.index(after: lastNewline)...])
+                    
+                    let results = self.processChunkInBackground(toProcess)
+                    DispatchQueue.main.async { [weak self] in
+                        self?.applyResults(results)
+                        self?.isReading = false
+                    }
+                } else {
+                    // No newline in this chunk, just buffer it
+                    self.trailingRemainder = fullContent
+                    DispatchQueue.main.async { self.isReading = false }
                 }
             } else {
                 DispatchQueue.main.async { self.isReading = false }
@@ -661,10 +700,11 @@ class LogParser: ObservableObject {
                     parseTextEvent(content: cleanContent, timestamp: timestamp, dateParser: localParseDate, into: &newEvents)
                 } else if let last = newEntries.last {
                     let updatedFull = capString(last.fullText + "\n" + content, limit: maxFullTextLength)
+                    let updatedClean = cleanLogContent(last.cleanContent + "\n" + content)
                     newEntries[newEntries.count - 1] = LogEntry(
                         id: last.id,
                         timestamp: last.timestamp,
-                        cleanContent: last.cleanContent,
+                        cleanContent: updatedClean,
                         fullText: updatedFull,
                         level: last.level
                     )
@@ -686,9 +726,16 @@ class LogParser: ObservableObject {
             self.events.removeAll()
         }
         
-        self.logs.append(contentsOf: results.logs)
-        if self.logs.count > maxLogItems {
-            self.logs.removeFirst(self.logs.count - maxLogItems)
+        // Filter out effectively empty results to prevent visual gaps in the list
+        let validLogs = results.logs.filter { !$0.cleanContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        
+        if isPaused {
+            pendingLogs.append(contentsOf: validLogs)
+        } else {
+            self.logs.append(contentsOf: validLogs)
+            if self.logs.count > maxLogItems {
+                self.logs.removeFirst(self.logs.count - maxLogItems)
+            }
         }
         
         if !results.events.isEmpty {
@@ -908,7 +955,7 @@ class LogParser: ObservableObject {
         if let range = text.range(of: "tcp://") ?? text.range(of: "udp://") ?? text.range(of: "wg://") {
             let start = text.index(range.lowerBound, offsetBy: 0)
             let end = text[start...].firstIndex(of: " ") ?? text.endIndex
-            return String(text[start..<end]).trimmingCharacters(in: CharacterSet(charactersIn: "\"',"))
+            return String(text[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"',"))
         }
         return nil
     }
@@ -1031,21 +1078,20 @@ struct EventListView: View {
                                 }
                                 .frame(width: 90, alignment: .trailing)
                                 .padding(.trailing, 10)
-                                .padding(.top, 2)
+                                .padding(.vertical, 10)
                                 
-                                // 2. Timeline
+                                // 2. Timeline (Continuous line)
                                 ZStack(alignment: .top) {
                                     Rectangle()
                                         .fill(Color.secondary.opacity(0.2))
                                         .frame(width: 2)
                                         .frame(maxHeight: .infinity)
-                                        .padding(.top, 10)
                                     
                                     Circle()
                                         .fill(event.type.color)
                                         .frame(width: 10, height: 10)
                                         .background(Color(NSColor.windowBackgroundColor))
-                                        .padding(.top, 6)
+                                        .padding(.top, 14) // Adjusted for new column padding
                                 }
                                 .frame(width: 16)
                                 .padding(.trailing, 12)
@@ -1058,21 +1104,21 @@ struct EventListView: View {
                                     
                                     // Properly unescape and display the formatted text
                                     Text(event.details
-                                            .replacingOccurrences(of: "\\n", with: "\n")
                                             .replacingOccurrences(of: "\\\"", with: "\"")
                                             .replacingOccurrences(of: "\\t", with: "    "))
                                         .font(.system(size: 12, design: .monospaced))
                                         .foregroundColor(.secondary)
                                         .textSelection(.enabled)
-                                        .padding(12)
+                                        .padding(16)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .background(Color(nsColor: .controlBackgroundColor))
                                         .cornerRadius(8)
                                 }
-                                .padding(.bottom, 16)
+                                .padding(.vertical, 10)
+                                .padding(.bottom, 6)
                             }
                             .listRowSeparator(.hidden)
-                            .padding(.vertical, 4)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                             .id(event.id) // Stable ID for the row
                         }
                     }
@@ -1148,24 +1194,57 @@ struct LogListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ZStack(alignment: .bottomTrailing) {
-                List {
-                    ForEach(filteredLogs.reversed()) { log in
-                        LogListRow(log: log, timestampFormatted: formatTimestamp(log.timestamp))
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedLog = log
-                            }
-                            .listRowSeparator(.visible)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .id(log.id) // Stable row ID
+                HStack(spacing: 0) {
+                    // Sidebar List
+                    List {
+                        ForEach(Array(filteredLogs.reversed().enumerated()), id: \.element.id) { index, log in
+                            LogListRow(log: log, timestampFormatted: formatTimestamp(log.timestamp), isSelected: selectedLog?.id == log.id)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedLog = (selectedLog?.id == log.id) ? nil : log
+                                    }
+                                }
+                                .listRowSeparator(.hidden) // Cleaner zebra look
+                                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                                .listRowBackground(
+                                    ZStack {
+                                        if selectedLog?.id == log.id {
+                                            Color.blue.opacity(0.15)
+                                        } else if index % 2 == 1 {
+                                            Color.primary.opacity(0.03) // Subtle zebra stripe
+                                        } else {
+                                            Color.clear
+                                        }
+                                    }
+                                )
+                                .id(log.id)
+                        }
+                    }
+                    .listStyle(.sidebar)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .frame(width: selectedLog == nil ? nil : 180) // Collapse to sidebar width when detail is open
+                    
+                    // Detail Column (The "Systems Settings" Style Detail)
+                    if let entry = selectedLog {
+                        Divider()
+                        VStack(spacing: 0) {
+                            LogDetailView(log: .constant(entry))
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .background(Color(nsColor: .windowBackgroundColor))
                     }
                 }
-                .listStyle(.inset)
-                .background(Color(nsColor: .textBackgroundColor))
                 .id("log-list-stable")
-                .popover(item: $selectedLog) { _ in
-                    LogDetailView(log: $selectedLog)
-                        .frame(width: 480, height: 360)
+                .onChange(of: selectedLog) { val in
+                    // When inspecting a log, pause UI updates to prevent the anchored row from shifting/jumping
+                    if val != nil {
+                        LogParser.shared.isPaused = true
+                    } else {
+                        LogParser.shared.isPaused = false
+                        LogParser.shared.flushPending()
+                    }
                 }
                 
                 // Floating "Scroll to Top" Button with Liquid Glass effect (macOS 26+)
@@ -1191,30 +1270,32 @@ struct LogListView: View {
 struct LogListRow: View {
     let log: LogEntry
     let timestampFormatted: String
+    var isSelected: Bool = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             // Content
             Text(log.cleanContent) // Use pre-calculated clean content
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
-                .foregroundColor(.primary)
-                .lineLimit(10)
-                .fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .monospaced))
+                .foregroundColor(isSelected ? .blue : .primary)
+                .lineLimit(isSelected ? 3 : 2, reservesSpace: true)
             
             // Bottom Bar: Time | Level Tag
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 // Time
-                Text(timestampFormatted)
-                    .font(.system(size: 11, design: .monospaced))
+                Text(timestampFormatted.suffix(8)) // Show only time to save space in sidebar
+                    .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(.secondary)
                 
                 Spacer()
                 
-                // Level Tag (Capsule) - Removed CORE tag since all logs are from core
-                LogListTagView(
-                    text: log.level.rawValue.uppercased(),
-                    color: log.level.color
-                )
+                if !isSelected {
+                    LogListTagView(
+                        text: log.level.rawValue.uppercased(),
+                        color: log.level.color
+                    )
+                    .scaleEffect(0.8)
+                }
             }
         }
         .contentShape(Rectangle())

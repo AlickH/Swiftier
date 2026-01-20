@@ -11,3 +11,7 @@ build/
 *.mode2v3
 *.moved-aside
 *.pbxuser
+
+*.log
+*.txt
+*.swift.tmp

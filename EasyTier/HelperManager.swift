@@ -58,6 +58,11 @@ final class HelperManager {
         let connection = NSXPCConnection(machServiceName: kHelperMachServiceName, options: .privileged)
         connection.remoteObjectInterface = NSXPCInterface(with: HelperProtocol.self)
         
+        // --- 双向通信配置 ---
+        // 导出接口给 Helper 调用（用于推送数据）
+        connection.exportedInterface = NSXPCInterface(with: HelperClientListener.self)
+        connection.exportedObject = ClientListener(manager: self)
+        
         connection.invalidationHandler = { [weak self] in
             self?.log("XPC connection invalidated")
             self?.connectionLock.lock()
@@ -359,7 +364,40 @@ final class HelperManager {
         }
     }
     
-    // MARK: - Private Helpers
+    // MARK: - Client Listener Implementation
     
+    // 内部类，用于处理 XPC 回调
+    private class ClientListener: NSObject, HelperClientListener {
+        weak var manager: HelperManager?
+        
+        init(manager: HelperManager) {
+            self.manager = manager
+        }
+        
+        func runningInfoUpdated(_ info: String) {
+            manager?.handleRunningInfoUpdate(info)
+        }
+        
+        func logUpdated(_ lines: [String]) {
+            // Placeholder: log updates
+        }
+    }
+    
+    private var pushHandler: ((String) -> Void)?
+    
+    /// 设置数据推送回调
+    func setPushHandler(_ handler: @escaping (String) -> Void) {
+        self.pushHandler = handler
+    }
+    
+    private func handleRunningInfoUpdate(_ info: String) {
+        DispatchQueue.main.async {
+            self.pushHandler?(info)
+        }
+    }
 
+    // 以前用于握手的逻辑现在已经不需要了
+    private func ensureBidirectionalSetup() {
+        // Standard XPC handles this on resume via exportedInterface
+    }
 }

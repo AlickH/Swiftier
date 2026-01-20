@@ -702,7 +702,9 @@ struct ConfigGeneratorView: View {
                         TextField("easytier", text: $model.networkName)
                             .multilineTextAlignment(.trailing)
                             .labelsHidden()
-                            .frame(maxWidth: .infinity) // 扩大点击区域
+                            .frame(maxWidth: .infinity)
+                            .textContentType(.none)
+                            .disableAutocorrection(true)
                     }
                     
                     HStack {
@@ -710,7 +712,9 @@ struct ConfigGeneratorView: View {
                         TextField("选填", text: $model.networkSecret)
                             .multilineTextAlignment(.trailing)
                             .labelsHidden()
-                            .frame(maxWidth: .infinity) // 扩大点击区域
+                            .frame(maxWidth: .infinity)
+                            .textContentType(.none)
+                            .disableAutocorrection(true)
                     }
                     
                     Picker("节点模式", selection: $model.peerMode) {
