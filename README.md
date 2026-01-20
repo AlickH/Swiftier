@@ -4,8 +4,8 @@
   <img src="https://raw.githubusercontent.com/AlickH/Swiftier/main/Swiftier.png" width="128" height="128" alt="Swiftier Icon">
 </p>
 <p align="center">
-  <img src="Light.png" width="300">
-  <img src="Dark.png" width="300">
+  <img src="https://github.com/AlickH/Swiftier/blob/main/Light.png?raw=true" width="300">
+  <img src="https://github.com/AlickH/Swiftier/blob/main/Dark.png?raw=true" width="300">
 </p>
 
 [中文说明](#简介) | [English](#introduction)
