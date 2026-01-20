@@ -140,7 +140,7 @@ final class HelperManager {
     }
     
     /// 启动 easytier-core
-    func startCore(configPath: String, rpcPort: String, consoleLevel: String, completion: @escaping (Bool, String?) -> Void) {
+    func startCore(configPath: String, consoleLevel: String, completion: @escaping (Bool, String?) -> Void) {
         log("Starting core via XPC... Level: \(consoleLevel)")
         log("Current SMAppService status: \(service.status.rawValue) (\(serviceStatus))")
         
@@ -150,7 +150,7 @@ final class HelperManager {
             installHelper { [weak self] success, error in
                 if success {
                     self?.log("Helper installation succeeded, retrying startCore...")
-                    self?.startCore(configPath: configPath, rpcPort: rpcPort, consoleLevel: consoleLevel, completion: completion)
+                    self?.startCore(configPath: configPath, consoleLevel: consoleLevel, completion: completion)
                 } else {
                     self?.log("Helper installation failed: \(error ?? "unknown")")
                     completion(false, error ?? "Failed to install helper")
@@ -160,21 +160,32 @@ final class HelperManager {
         }
         
         log("Helper is enabled, proceeding with XPC call...")
-        // 获取 easytier-core 可执行文件路径
-        guard let corePath = getCorePath() else {
-            completion(false, "Cannot find easytier-core executable")
-            return
-        }
+        let corePath = "" // Embedded core, path not needed
         
-        // 定义 XPC 错误处理器
-        let xpcErrorHandler: (Error) -> Void = { error in
+        // 定义 XPC 错误处理器 - 当连接失败时强制重装 Helper
+        let xpcErrorHandler: (Error) -> Void = { [weak self] error in
+            guard let self = self else { return }
             self.log("XPC communication failed: \(error.localizedDescription)")
-            // 如果连接失败，可能是服务已死但状态仍为 enabled。尝试强制重装。
-            // 避免无限递归：这里只在第一次失败时尝试重装，或者简单地返回失败让上层重试
-            // 简单策略：直接报错，EasyTierRunner 只有一层 Retry。
-            // 但如果这里能检测到 invalidation，最好主动 invalid connection 触发重连
+            self.log("SMAppService reports enabled but XPC failed. Forcing reinstall...")
             self.invalidateConnection()
-            completion(false, "XPC Error: \(error.localizedDescription)")
+            
+            // 强制重装：先注销再注册
+            self.uninstallHelper { [weak self] _, _ in
+                guard let self = self else { return }
+                self.log("Uninstall completed. Now reinstalling...")
+                
+                self.installHelper { [weak self] success, installError in
+                    guard let self = self else { return }
+                    if success {
+                        self.log("Reinstall succeeded. Retrying startCore...")
+                        // 递归调用 startCore，这次应该能连上了
+                        self.startCore(configPath: configPath, consoleLevel: consoleLevel, completion: completion)
+                    } else {
+                        self.log("Reinstall failed: \(installError ?? "unknown")")
+                        completion(false, "XPC Error and reinstall failed: \(installError ?? error.localizedDescription)")
+                    }
+                }
+            }
         }
 
         guard let helper = getHelper(errorHandler: xpcErrorHandler) else {
@@ -196,7 +207,7 @@ final class HelperManager {
                         if success {
                             self.log("Helper auto-updated successfully. Retrying start...")
                             // 递归调用（注意：这可能会导致死循环如果安装一直成功但连接一直失败，建议增加深度控制，暂且认为安装成功就能连上）
-                            self.startCore(configPath: configPath, rpcPort: rpcPort, consoleLevel: consoleLevel, completion: completion)
+                            self.startCore(configPath: configPath, consoleLevel: consoleLevel, completion: completion)
                         } else {
                             completion(false, "Failed to update helper: \(error ?? "Unknown error")")
                         }
@@ -223,7 +234,7 @@ final class HelperManager {
             
             let targetConfigPath = FileManager.default.fileExists(atPath: tmpConfigPath) ? tmpConfigPath : configPath
             
-            helper.startCore(configPath: targetConfigPath, rpcPort: rpcPort, corePath: corePath, consoleLevel: consoleLevel) { success, error in
+            helper.startCore(configPath: targetConfigPath, corePath: corePath, consoleLevel: consoleLevel) { success, error in
                 DispatchQueue.main.async {
                     completion(success, error)
                 }
@@ -333,30 +344,22 @@ final class HelperManager {
         }
     }
     
-    // MARK: - Private Helpers
-    
-    private func getCorePath() -> String? {
-        // 1. Check Application Support (Auto-download location)
-        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-             let customPath = appSupport.appendingPathComponent("Swiftier/bin/easytier-core").path
-             if FileManager.default.fileExists(atPath: customPath) {
-                 return customPath
-             }
+    /// 获取运行时信息（包含 peers、routes 等）
+    /// - Parameter completion: 回调，返回 JSON 字符串（nil 表示未运行或出错）
+    func getRunningInfo(completion: @escaping (String?) -> Void) {
+        guard let helper = getHelper() else {
+            completion(nil)
+            return
         }
         
-        // 2. Fallback to Bundle
-        if let path = Bundle.main.path(forResource: "easytier-core", ofType: nil) {
-            return path
-        }
-        
-        // 3. Fallback: Check adjacent to executable
-        if let execURL = Bundle.main.executableURL {
-            let corePath = execURL.deletingLastPathComponent().appendingPathComponent("easytier-core").path
-            if FileManager.default.fileExists(atPath: corePath) {
-                return corePath
+        helper.getRunningInfo { info in
+            DispatchQueue.main.async {
+                completion(info)
             }
         }
-        
-        return nil
     }
+    
+    // MARK: - Private Helpers
+    
+
 }

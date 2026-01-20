@@ -39,7 +39,26 @@
           "fill-specializations" : [
             {
               "value" : {
-                "solid" : "extended-gray:1.00000,1.00000"
+                "automatic-gradient" : "extended-gray:1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:0.00000,0.76471,0.81569,1.00000",
+                  "extended-srgb:0.00000,0.75294,0.90980,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 1,
+                    "y" : 0.1774021107972379
+                  },
+                  "stop" : {
+                    "x" : 0,
+                    "y" : 0.19003060263653482
+                  }
+                }
               }
             },
             {

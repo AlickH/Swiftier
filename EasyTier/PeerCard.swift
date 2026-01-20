@@ -183,24 +183,32 @@ struct PeerCard: View {
     
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 10)
-            .fill(cardFill)
-            .shadow(color: Color.black.opacity(0.1), radius: 1, x: 0, y: 1)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.6)) // Match SpeedCard background
+            .background(borderColor.opacity(0.05)) // Add subtle tint to match SpeedCard's visual weight
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(cardBorderColor, lineWidth: cardBorderWidth)
+                    .stroke(borderColor.opacity(0.6), lineWidth: 1) // Increased opacity for better visibility
             )
+            .clipShape(RoundedRectangle(cornerRadius: 10)) // Ensure background tint is clipped
     }
     
-    private var cardFill: Color {
-        Color(nsColor: .controlBackgroundColor)
-    }
-    
-    private var cardBorderColor: Color {
-        Color(nsColor: .separatorColor)
-    }
-    
-    private var cardBorderWidth: CGFloat {
-        1.0
+    // Logic to determine border color based on Peer Type
+    private var borderColor: Color {
+        // 1. Local (本机)
+        let tunnelLower = peer.tunnel.lowercased()
+        if tunnelLower == "local" || peer.ipv4.lowercased().contains("local") {
+            return .blue
+        }
+        
+        // 2. Public Peer (Public)
+        if peer.ipv4.isEmpty || 
+           peer.ipv4.lowercased().contains("public") || 
+           peer.hostname.lowercased().contains("public") {
+            return .red
+        }
+        
+        // 3. Remote (远端机器) - Changed from .yellow to .green for visibility
+        return .green
     }
 }
 
@@ -274,22 +282,6 @@ struct PeerDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("节点详情").font(.headline)
-                Spacer()
-                Button {
-                    presentationMode.wrappedValue.dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
-            .background(Color(nsColor: .controlBackgroundColor))
-            
             Form {
                 Section("节点") {
                     DetailRow(label: "主机名", value: peer.hostname)

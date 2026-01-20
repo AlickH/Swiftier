@@ -1,0 +1,13 @@
+.DS_Store
+*.profraw
+*.profdata
+SwiftierHelper_Debug
+.generated_files/
+UserInterfaceState.xcuserstate
+xcuserdata/
+DerivedData/
+build/
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser

@@ -18,15 +18,22 @@ final class EasyTierRunner: ObservableObject {
     
     private var uptimeTimer: AnyCancellable?
     private var timer: AnyCancellable?
-    private let rpcPort = "15888"
-    private let cliClient: CliClient
     
     private var currentSessionID = UUID()
     private var lastConfigPath: String?
+    
+    // Speed calculation
+    private var lastTotalRx: Int = 0
+    private var lastTotalTx: Int = 0
+    private var lastPollTime: Date?
+    
+    @Published var virtualIP: String = "-"
+    
+    // Speed history for graphs
+    @Published var downloadHistory: [Double] = Array(repeating: 0.0, count: 20)
+    @Published var uploadHistory: [Double] = Array(repeating: 0.0, count: 20)
 
     private init() {
-        cliClient = CliClient(rpcPort: rpcPort)
-        
         // 启动时立即检查 Core 的真实运行状态
         syncWithCoreState()
     }
@@ -58,6 +65,7 @@ final class EasyTierRunner: ObservableObject {
                             }
                             
                             self.currentSessionID = UUID()
+                            self.resetSpeedCounters()
                             self.startUptimeTimer()
                             self.startMonitoring()
                             
@@ -66,7 +74,7 @@ final class EasyTierRunner: ObservableObject {
                         }
                     }
                 } else {
-                    // 旧系统 fallback
+                    // 旧系统 fallback (其实已经不再需要，因为 target >= 13.0)
                     DispatchQueue.main.async {
                         self.isRunning = true
                         self.startedAt = Date()
@@ -77,53 +85,22 @@ final class EasyTierRunner: ObservableObject {
                     }
                 }
             } else {
-                // XPC 方式检测不到 Core，但可能有遗留进程
-                // 使用 pgrep 做最后一次检查
-                self.checkCoreProcessDirectly { processRunning in
-                    DispatchQueue.main.async {
-                        if processRunning {
-                            // 有遗留进程，但我们无法获取精确的启动时间
-                            self.isRunning = true
-                            self.startedAt = Date() // 无法获取真实时间，从现在开始计
-                            self.currentSessionID = UUID()
-                            self.startUptimeTimer()
-                            self.startMonitoring()
-                            print("[Runner] Found orphan Core process, syncing UI state")
-                            completion?(true)
-                        } else {
-                            // Core 确实未运行，清理状态
-                            self.isRunning = false
-                            self.startedAt = nil
-                            self.uptimeText = "00:00:00"
-                            self.peers = []
-                            print("[Runner] No Core process detected")
-                            completion?(false)
-                        }
-                    }
+                // Core 未运行
+                DispatchQueue.main.async {
+                    self.isRunning = false
+                    self.startedAt = nil
+                    self.uptimeText = "00:00:00"
+                    self.peers = []
+                    self.downloadHistory = Array(repeating: 0.0, count: 20)
+                    self.uploadHistory = Array(repeating: 0.0, count: 20)
+                    print("[Runner] No Core process detected via Helper")
+                    completion?(false)
                 }
             }
         }
     }
     
-    /// 直接通过系统命令检查 easytier-core 进程是否存在
-    private func checkCoreProcessDirectly(completion: @escaping (Bool) -> Void) {
-        DispatchQueue.global(qos: .utility).async {
-            let task = Process()
-            task.launchPath = "/usr/bin/pgrep"
-            task.arguments = ["-x", "easytier-core"]
-            let pipe = Pipe()
-            task.standardOutput = pipe
-            task.standardError = pipe
-            
-            do {
-                try task.run()
-                task.waitUntilExit()
-                completion(task.terminationStatus == 0)
-            } catch {
-                completion(false)
-            }
-        }
-    }
+    // checkCoreProcessDirectly removed as it's not applicable for embedded core
 
     // --- 保留功能：磁盘访问权限检查 ---
     var hasFullDiskAccess: Bool {
@@ -204,7 +181,7 @@ final class EasyTierRunner: ObservableObject {
     }
     
     private func performStart(configPath: String, newSessionID: UUID, retryCount: Int = 1) {
-        CoreService.shared.start(configPath: configPath, rpcPort: rpcPort) { [weak self] success in
+        CoreService.shared.start(configPath: configPath) { [weak self] success in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
@@ -213,17 +190,8 @@ final class EasyTierRunner: ObservableObject {
                     self.startedAt = Date()
                     self.startUptimeTimer()
                     
-                    // Instead of a fixed delay, we now intelligently wait for the RPC to become ready
-                    self.waitForRpcReady(sessionID: newSessionID) { ready in
-                        if ready {
-                            print("[Runner] RPC Ready. Starting monitoring.")
-                            self.startMonitoring()
-                        } else {
-                            print("[Runner] RPC timed out. Monitoring might be delayed.")
-                            // Fallback to start monitoring anyway, it might work later
-                            self.startMonitoring()
-                        }
-                    }
+                    print("[Runner] Service started successfully. Starting monitoring.")
+                    self.startMonitoring()
                     self.isProcessing = false
                 } else {
                     // Retry logic
@@ -253,41 +221,6 @@ final class EasyTierRunner: ObservableObject {
         }
     }
     
-    private func waitForRpcReady(sessionID: UUID, retries: Int = 10, completion: @escaping (Bool) -> Void) {
-        Task {
-            // Attempt a lightweight command to check connectivity
-            // We can just try to fetch peers, if it returns valid array (empty or not) it means RPC is up
-            _ = await self.cliClient.fetchPeers(sessionID: sessionID)
-            
-            // Check if we are still the valid session (user hasn't stopped service while we waited)
-            if self.currentSessionID != sessionID { return }
-            
-            // If we got a result (even empty), RPC is likely working.
-            // However, fetchPeers might return empty array on connection error too if not handled carefully.
-            // Let's assume CliClient returns empty array on error.
-            // A better check would be checking the logs or CliClient should return optional.
-            // For now, let's rely on the fact that if it connects, it works.
-            // To be robust:
-            
-            // Actually, we should check if startMonitoring would succeed.
-            // Let's just Loop.
-            
-            DispatchQueue.main.async {
-                // If retries exhausted
-                if retries <= 0 {
-                    completion(false)
-                    return
-                }
-                
-                // If peers fetch 'seems' to have failed (we can't distinguish easily yet without modifying CliClient)
-                // Let's assume it failed if we are here and retry.
-                // Wait 0.5s
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self.waitForRpcReady(sessionID: sessionID, retries: retries - 1, completion: completion)
-                }
-            }
-        }
-    }
 
     /// Wait until the Core process is confirmed dead
     private func waitForCoreCleanup(timeout: TimeInterval = 3.0, completion: @escaping (Bool) -> Void) {
@@ -326,7 +259,7 @@ final class EasyTierRunner: ObservableObject {
                     let newSessionID = UUID()
                     self.currentSessionID = newSessionID
                     
-                    CoreService.shared.start(configPath: path, rpcPort: self.rpcPort) { success in
+                    CoreService.shared.start(configPath: path) { success in
                         DispatchQueue.main.async {
                             if success {
                                 self.isRunning = true
@@ -348,15 +281,24 @@ final class EasyTierRunner: ObservableObject {
     }
 
     func openLogFile() {
-        CoreService.shared.openLogFile()
+        let logPath = "/var/log/swiftier-helper.log"
+        if FileManager.default.fileExists(atPath: logPath) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: logPath))
+        }
     }
 
     private func startMonitoring() {
+        // OPTIMIZATION: Do NOT start LogParser file monitoring here.
+        // LogParser.shared.startMonitoring() reads the log file every second, consuming high CPU.
+        // Events are already fetched via getRunningInfo RPC in refreshPeersOnce.
+        // File monitoring should only be active when LogView is visible (handled in LogView.swift).
+        
+        resetSpeedCounters()
+        
         timer?.cancel()
-        refreshPeersOnce()
-
+        
         let interval = UserDefaults.standard.double(forKey: "refreshInterval")
-        let finalInterval = interval > 0 ? interval : 1.0
+        let finalInterval = interval > 0 ? interval : 2.0
         
         timer = Timer.publish(every: finalInterval, on: .main, in: .common)
             .autoconnect()
@@ -364,17 +306,197 @@ final class EasyTierRunner: ObservableObject {
                 self?.refreshPeersOnce()
             }
     }
+    
+    private func resetSpeedCounters() {
+        lastTotalRx = 0
+        lastTotalTx = 0
+        lastPollTime = nil
+        downloadHistory = Array(repeating: 0.0, count: 20)
+        uploadHistory = Array(repeating: 0.0, count: 20)
+    }
 
     private func refreshPeersOnce() {
-        Task { [weak self] in
-            guard let self = self else { return }
+        guard #available(macOS 13.0, *) else { return }
+        
+        HelperManager.shared.getRunningInfo { [weak self] jsonStr in
+            guard let self = self, let jsonStr = jsonStr else { return }
             
-            let fetchedPeers = await self.cliClient.fetchPeers(sessionID: self.currentSessionID)
+            guard let data = jsonStr.data(using: .utf8) else { return }
+            
+            // Decode using the new model
+            guard let status = try? JSONDecoder().decode(EasyTierStatus.self, from: data) else {
+                print("Failed to decode EasyTierStatus")
+                return
+            }
+            
+            // 1. Update Events
+            LogParser.shared.updateEventsFromRunningInfo(status.events)
+            
+            // 2. Update Peers
+            var fetchedPeers: [PeerInfo] = []
+            
+            // Add Local Node as a card (per USER preference)
+            if let myNode = status.myNodeInfo {
+                let localPeer = PeerInfo(
+                    sessionID: self.currentSessionID,
+                    ipv4: "\(myNode.virtualIPv4?.description ?? "-") (Local)",
+                    hostname: myNode.hostname,
+                    cost: "本机",
+                    latency: "0",
+                    loss: "0.0%",
+                    rx: "-",
+                    tx: "-",
+                    tunnel: "LOCAL",
+                    nat: self.natTypeString(myNode.stunInfo?.udpNATType ?? 0),
+                    version: myNode.version
+                )
+                fetchedPeers.append(localPeer)
+            }
+            
+            for pair in status.peerRoutePairs {
+                // ... (rest of peer loop unchanged)
+                // Route Info
+                let ipv4 = pair.route.ipv4Addr?.description ?? ""
+                let hostname = pair.route.hostname
+                let costStr = pair.route.cost == 1 ? "P2P" : "Relay(\(pair.route.cost))"
+                let version = pair.route.version
+                
+                // Aggregation Vars
+                var latencyVal = ""
+                var lossVal = ""
+                var rxVal = ""
+                var txVal = ""
+                var tunnelVal = ""
+                
+                if let peer = pair.peer {
+                    var totalRx = 0
+                    var totalTx = 0
+                    var latencySum = 0
+                    var latencyCount = 0
+                    var lossSum = 0.0
+                    var lossCount = 0
+                    var tunnelTypes: Set<String> = []
+                    
+                    for conn in peer.conns {
+                        // Stats
+                        if let stats = conn.stats {
+                            latencySum += stats.latencyUs
+                            latencyCount += 1
+                            totalRx += stats.rxBytes
+                            totalTx += stats.txBytes
+                        }
+                        
+                        // Loss
+                        lossSum += conn.lossRate
+                        lossCount += 1
+                        
+                        // Tunnel
+                        if let type = conn.tunnel?.tunnelType {
+                            tunnelTypes.insert(type.uppercased())
+                        }
+                    }
+                    
+                    // Averages & Formatting
+                    if latencyCount > 0 {
+                        let avgLatencyMs = Double(latencySum) / Double(latencyCount) / 1000.0
+                        latencyVal = String(format: "%.1f", avgLatencyMs)
+                    } else if let pathLat = pair.route.pathLatency, pathLat > 0 {
+                         latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
+                    }
+                    
+                    if lossCount > 0 {
+                        let avgLoss = lossSum / Double(lossCount)
+                        lossVal = String(format: "%.1f%%", avgLoss * 100)
+                    }
+                    
+                    rxVal = self.formatBytes(totalRx)
+                    txVal = self.formatBytes(totalTx)
+                    tunnelVal = tunnelTypes.sorted().joined(separator: "&")
+                } else {
+                     // No direct connection, use route info if available
+                    if let pathLat = pair.route.pathLatency, pathLat > 0 {
+                         latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
+                    }
+                }
+                
+                // NAT Type
+                var natVal = ""
+                if let natType = pair.route.stunInfo?.udpNATType {
+                    natVal = self.natTypeString(natType)
+                }
+                
+                let peerInfo = PeerInfo(
+                    sessionID: self.currentSessionID,
+                    ipv4: ipv4,
+                    hostname: hostname,
+                    cost: costStr,
+                    latency: latencyVal,
+                    loss: lossVal,
+                    rx: rxVal,
+                    tx: txVal,
+                    tunnel: tunnelVal,
+                    nat: natVal,
+                    version: version
+                )
+                fetchedPeers.append(peerInfo)
+            }
+            
+            // 3. Update Speeds
+            let now = Date()
+            var totalRx = 0
+            var totalTx = 0
+            
+            for pair in status.peerRoutePairs {
+                if let peer = pair.peer {
+                    for conn in peer.conns {
+                        if let stats = conn.stats {
+                            totalRx += stats.rxBytes
+                            totalTx += stats.txBytes
+                        }
+                    }
+                }
+            }
+            
+            if let lastTime = self.lastPollTime, let lastRx = Optional(self.lastTotalRx), let lastTx = Optional(self.lastTotalTx) {
+                let duration = now.timeIntervalSince(lastTime)
+                if duration > 0 {
+                    let rxSpeed = Double(totalRx - lastRx) / duration
+                    let txSpeed = Double(totalTx - lastTx) / duration
+                    
+                    DispatchQueue.main.async {
+                        self.downloadSpeed = "\(self.formatSpeed(rxSpeed))"
+                        self.uploadSpeed = "\(self.formatSpeed(txSpeed))"
+                        
+                        // Update history
+                        self.downloadHistory.append(rxSpeed)
+                        if self.downloadHistory.count > 20 { self.downloadHistory.removeFirst() }
+                        
+                        self.uploadHistory.append(txSpeed)
+                        if self.uploadHistory.count > 20 { self.uploadHistory.removeFirst() }
+                    }
+                }
+            }
+            
+            self.lastTotalRx = totalRx
+            self.lastTotalTx = totalTx
+            self.lastPollTime = now
+            
+            // 4. Update Node Info (Global state for speeds, but card handles IP)
+            if let myIp = status.myNodeInfo?.virtualIPv4?.description {
+                DispatchQueue.main.async { self.virtualIP = myIp }
+            }
             
             let sortedPeers = fetchedPeers.sorted { p1, p2 in
-                let isP1Public = p1.ipv4.contains("Public")
-                let isP2Public = p2.ipv4.contains("Public")
+                // Original Rule: Local first, then IP sorted, Public at the end
+                let isP1Local = p1.ipv4.contains("Local")
+                let isP2Local = p2.ipv4.contains("Local")
+                if isP1Local != isP2Local { return isP1Local }
+                
+                // Public nodes have empty IP or "Public" in hostname/IP
+                let isP1Public = p1.ipv4.isEmpty || p1.ipv4.contains("Public") || p1.hostname.lowercased().contains("public")
+                let isP2Public = p2.ipv4.isEmpty || p2.ipv4.contains("Public") || p2.hostname.lowercased().contains("public")
                 if isP1Public != isP2Public { return !isP1Public }
+                
                 return p1.ipv4.localizedStandardCompare(p2.ipv4) == .orderedAscending
             }
             
@@ -385,6 +507,39 @@ final class EasyTierRunner: ObservableObject {
                 self.peerCount = "\(sortedPeers.count)"
             }
         }
+    }
+    
+    private func formatSpeed(_ bytesPerSec: Double) -> String {
+        if bytesPerSec < 1024 { return String(format: "%.0f B/s", bytesPerSec) }
+        let kb = bytesPerSec / 1024.0
+        if kb < 1024 { return String(format: "%.1f KB/s", kb) }
+        let mb = kb / 1024.0
+        return String(format: "%.1f MB/s", mb)
+    }
+
+    
+    private func natTypeString(_ type: Int) -> String {
+        switch type {
+        case 1: return "Open"
+        case 2: return "NoPAT"
+        case 3: return "FullCone"
+        case 4: return "Restricted"
+        case 5: return "PortRestricted"
+        case 6: return "Symmetric"
+        case 7: return "SymUDPFirewall"
+        case 8, 9: return "SymEasy"
+        default: return "Unknown"
+        }
+    }
+    
+    private func formatBytes(_ bytes: Int) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        let kb = Double(bytes) / 1024.0
+        if kb < 1024 { return String(format: "%.1f KB", kb) }
+        let mb = kb / 1024.0
+        if mb < 1024 { return String(format: "%.1f MB", mb) }
+        let gb = mb / 1024.0
+        return String(format: "%.2f GB", gb)
     }
 
     private func startUptimeTimer() {

@@ -14,16 +14,7 @@ struct SettingsView: View {
     
     @ObservedObject private var permissionManager = PermissionManager.shared
     
-    // Kernel Settings
-    @ObservedObject private var downloader = CoreDownloader.shared
-    @AppStorage("useBetaChannel") private var useBetaChannel = false
-    @AppStorage("useGitHubProxy") private var useGitHubProxy = true
-    @State private var checkUpdateStatus: String?
-    @State private var isCheckingUpdate = false
-    @State private var showUpdateAlert = false
-    @State private var newVersionInfo: (version: String, body: String)?
     
-    @State private var showUpdateDetail = false
     @State private var showLicense = false
     
     // APP Update Check
@@ -145,48 +136,6 @@ struct SettingsView: View {
                 
 
                 
-                Section("内核管理") {
-                    HStack {
-                        Text("内核版本")
-                        Spacer()
-                        if let v = downloader.currentVersion {
-                            Text(v).foregroundColor(.secondary)
-                        } else {
-                            Text("未安装").foregroundColor(.red)
-                        }
-                    }
-                    
-                    Toggle("使用 GitHub 加速镜像 (ghfast.top)", isOn: $useGitHubProxy)
-                    Toggle("接收 Beta 版本更新", isOn: $useBetaChannel)
-                    
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Button("检查更新") {
-                                performUpdateCheck()
-                            }
-                            .disabled(downloader.isDownloading || isCheckingUpdate)
-                            
-                            if isCheckingUpdate {
-                                ProgressView().controlSize(.small)
-                            }
-                        }
-                        
-                        if downloader.isDownloading {
-                            VStack(alignment: .leading) {
-                                Text(downloader.statusMessage)
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                ProgressView(value: downloader.downloadProgress)
-                            }
-                        } else if let status = checkUpdateStatus {
-                            Text(status)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-
-                }
-                
                 Section(header: Text("日志"), footer: Text("修改日志等级后，需要停止并重新启动服务才能生效。")) {
                     Picker("日志等级", selection: $logLevel) {
                         ForEach(logLevels, id: \.self) { level in
@@ -249,21 +198,7 @@ struct SettingsView: View {
             } // End VStack
             .background(Color(nsColor: .windowBackgroundColor)) // 整体背景
             
-            // Update Detail Sheet
-            if showUpdateDetail, let info = newVersionInfo {
-                UpdateDetailView(
-                    isPresented: $showUpdateDetail,
-                    version: info.version,
-                    releaseNotes: info.body,
-                    onUpdate: {
-                        Task {
-                             checkUpdateStatus = nil
-                             try? await downloader.installCore(useBeta: useBetaChannel, useProxy: useGitHubProxy)
-                        }
-                    }
-                )
-                .transition(.move(edge: .bottom))
-            }
+
             
             // License Popup
             if showLicense {
@@ -308,32 +243,7 @@ struct SettingsView: View {
         }
     }
     
-    private func performUpdateCheck() {
-        isCheckingUpdate = true
-        checkUpdateStatus = "正在检查..."
-        Task {
-            do {
-                // Check if update available
-                if let (ver, body) = try await downloader.checkForUpdate(useBeta: useBetaChannel) {
-                    await MainActor.run {
-                        newVersionInfo = (ver, body)
-                        showUpdateDetail = true
-                        checkUpdateStatus = nil
-                    }
-                } else {
-                    await MainActor.run {
-                        checkUpdateStatus = "当前已是最新版本"
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    checkUpdateStatus = "检查失败: \(error.localizedDescription)"
-                }
-            }
-            await MainActor.run { isCheckingUpdate = false }
-        }
-    }
-    
+
     private func checkAppUpdate() {
         isCheckingAppUpdate = true
         appUpdateStatus = "正在检查..."
@@ -421,37 +331,7 @@ struct SettingsView: View {
     }
 }
 
-struct UpdateDetailView: View {
-    @Binding var isPresented: Bool
-    let version: String
-    let releaseNotes: String
-    let onUpdate: () -> Void
-    
-    // Clean version string: remove 'v' prefix if present to avoid "vv2.5.0"
-    private var displayVersion: String {
-        version.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
-    }
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            UnifiedHeader(title: "新版本 \(displayVersion)") {
-                Button("关闭") { withAnimation { isPresented = false } }
-                    .buttonStyle(.bordered)
-            } right: {
-                Button("立即更新") {
-                    onUpdate()
-                    withAnimation { isPresented = false }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            
-            // Web Content
-            MarkdownWebView(markdown: releaseNotes)
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-}
+
 
 struct AppUpdateDetailView: View {
     @Binding var isPresented: Bool

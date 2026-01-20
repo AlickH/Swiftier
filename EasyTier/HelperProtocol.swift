@@ -11,7 +11,7 @@ public protocol HelperProtocol {
     ///   - rpcPort: RPC 监听端口
     ///   - corePath: easytier-core 可执行文件路径
     ///   - reply: 回调，返回是否成功和错误信息
-    func startCore(configPath: String, rpcPort: String, corePath: String, consoleLevel: String, reply: @escaping (Bool, String?) -> Void)
+    func startCore(configPath: String, corePath: String, consoleLevel: String, reply: @escaping (Bool, String?) -> Void)
     
     /// 停止 easytier-core
     /// - Parameter reply: 回调，返回是否成功
@@ -36,10 +36,14 @@ public protocol HelperProtocol {
     
     /// 退出 Helper 进程
     func quitHelper(reply: @escaping (Bool) -> Void)
+    
+    /// 获取运行时信息（包含 peers、routes 等）
+    /// - Parameter reply: 回调，返回 JSON 字符串（nil 表示未运行或出错）
+    func getRunningInfo(reply: @escaping (String?) -> Void)
 }
 
 /// Helper 的 Mach 服务名称
 public let kHelperMachServiceName = "com.alick.swiftier.helper"
 /// Helper 的目标版本号 (Helper Protocol 版本) - 升级以触发自动更新
-public let kTargetHelperVersion = "1.3.0"
+public let kTargetHelperVersion = "1.3.5"
 

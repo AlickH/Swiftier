@@ -5,7 +5,7 @@ struct ContentView: View {
     
     @StateObject private var runner = EasyTierRunner.shared
     @StateObject private var configManager = ConfigManager.shared
-    @StateObject private var downloader = CoreDownloader.shared
+
     @StateObject private var permissionManager = PermissionManager.shared
     
     @State private var selectedConfig: URL?
@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var showCreatePrompt = false
     @State private var showFDAOverlay = false
     @State private var newConfigName = ""
+    @State private var isWindowVisible = true // Track window visibility to pause rendering
     
     private let windowWidth: CGFloat = 420
     private let windowHeight: CGFloat = 520
@@ -115,12 +116,7 @@ struct ContentView: View {
                 .transition(.scale.combined(with: .opacity))
             }
             
-            // Core Downloader / Missing Alert
-            if !downloader.isInstalled || downloader.isDownloading {
-                DownloadingView(downloader: downloader)
-                    .zIndex(999)
-                    .transition(.opacity)
-            }
+
             
             // FDA Permission Guide
             if showFDAOverlay && !permissionManager.isFDAGranted {
@@ -173,6 +169,12 @@ struct ContentView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            isWindowVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            isWindowVisible = false
+        }
     }
     
     // MARK: - Header
@@ -224,7 +226,7 @@ struct ContentView: View {
                 Button("存储到 iCloud") { configManager.migrateToiCloud() }
                 Button("选择文件夹") { configManager.selectCustomFolder() }
                 Button("在 Finder 中打开") { configManager.openiCloudFolder() }
-                Button("打开内核文件夹") { NSWorkspace.shared.open(CoreDownloader.shared.installDirectory) }
+
                 
                 Divider()
                 
@@ -327,18 +329,17 @@ struct ContentView: View {
     private var contentArea: some View {
         GeometryReader { geo in
             ZStack {
-                // 在 contentArea 的 ZStack 中
+                // 1) 水波纹层 (放在最底层)
                 if runner.isRunning {
-                    RippleRings(isVisible: runner.isRunning, duration: 4.0, maxScale: 5.5)
-                        .frame(width: 90, height: 90)
+                    RippleRings(isVisible: runner.isRunning && isWindowVisible, duration: 4.0, maxScale: 5.5)
+                        .frame(width: 500, height: 500) // Increased frame to prevent Metal clipping
                         .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
-                        .zIndex(-1)
+                        .zIndex(0)
                 }
 
-                // 2) 节点卡片容器
+                // 2) 节点列表区域
                 if runner.isRunning {
                     if !runner.peers.isEmpty {
-                        // 2a) 节点卡片容器
                         ScrollView(.vertical, showsIndicators: false) {
                             LazyVGrid(
                                 columns: [
@@ -350,73 +351,341 @@ struct ContentView: View {
                                 ForEach(runner.peers) { peer in
                                     PeerCard(peer: peer)
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
-                                        .transition(.asymmetric(
-                                            insertion: .move(edge: .bottom),
-                                            removal: .opacity
-                                        ))
                                 }
                             }
+                            .padding(.top, 10) // Small top padding inside scroll
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .padding(.horizontal, 12)
-                        .padding(.top, 180)
-                        .zIndex(1)
+                        .clipShape(RoundedRectangle(cornerRadius: 10)) // Clip content at scroll boundaries
+                        .padding(.horizontal, 12) // PeerList padding is 12
+                        .padding(.top, 165) // Reduced to maximize peer list area
                         .padding(.bottom, 12)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .opacity
-                        ))
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: runner.peers.map(\.id).joined().hashValue)
-                    } else {
-                        // 2b) 占位提示 (正在获取节点)
-                        VStack(spacing: 20) {
-                            ProgressView()
-                                .controlSize(.regular)
-                                .scaleEffect(1.2)
-                            Text("节点加载中")
-                                .font(.title3.bold())
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 180)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .offset(y: -20)
                         .zIndex(1)
-                        .transition(.opacity)
+                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
+                    } else {
+                        VStack(spacing: 20) {
+                            ProgressView().scaleEffect(1.2).controlSize(.large)
+                            Text("节点加载中").font(.title3.bold()).foregroundColor(.secondary)
+                        }
+                        .padding(.top, 165)
+                        .zIndex(1)
                     }
                 }
 
-                // 3) 启动按钮
-                Button {
-                    if runner.isRunning {
-                        // 正在运行，直接调用 toggleService (内部会处理 stop)
-                        // 或者如果 toggleService 必须传 path，我们可以传个空字符串或 dummy，只要 runner 内部处理了 stop
-                        // 让我们看看 runner.toggleService 的实现。通常 stop 不需要 path。
-                        // 如果 runner.toggleService 强依赖 path，我们先尝试取 selectedConfig，取不到就取列表第一个
+                // 3) 启动按钮与网速仪表盘层
+                HStack(spacing: -6) { // Slight negative spacing for a connected but not obscuring look
+                    // Calculate unified max scale for both cards
+                    let maxSpeed = max(
+                        (runner.downloadHistory.max() ?? 10.0),
+                        (runner.uploadHistory.max() ?? 10.0)
+                    )
+                    
+                    // Download Card
+                    SpeedCard(
+                        title: "DOWNLOAD",
+                        value: runner.downloadSpeed,
+                        icon: "arrow.down.square.fill",
+                        color: .blue,
+                        history: runner.downloadHistory,
+                        maxVal: maxSpeed,
+                        isVisible: runner.isRunning && isWindowVisible
+                    )
+                    
+                    // Center Power Button
+                    Button {
                         let path = selectedConfig?.path ?? configManager.configFiles.first?.path ?? ""
                         runner.toggleService(configPath: path)
-                    } else {
-                        // 没运行，必须要有配置才能启动
-                        if let path = selectedConfig?.path {
-                            runner.toggleService(configPath: path)
-                        }
+                    } label: {
+                        StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
                     }
-                } label: {
-                    StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
+                    .buttonStyle(.plain)
+                    .zIndex(20)
+                    
+                    // Upload Card
+                    SpeedCard(
+                        title: "UPLOAD",
+                        value: runner.uploadSpeed,
+                        icon: "arrow.up.square.fill",
+                        color: .orange, // Changed from .green to .orange as per original content
+                        history: runner.uploadHistory,
+                        maxVal: maxSpeed,
+                        isVisible: runner.isRunning && isWindowVisible // Modified: 2. 在 SpeedCard 调用中加入 && isWindowVisible 条件。
+                    )
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 12) // Match PeerList padding exactly
+                .frame(width: geo.size.width) // Use full width, padding handles inset
                 .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
                 .zIndex(10)
             }
-            // Only apply isRunning animation to the container (for layout/button transitions)
             .animation(.spring(response: 1.0, dampingFraction: 0.8), value: runner.isRunning)
             .animation(.spring(response: 0.55, dampingFraction: 0.8), value: showLogView)
         }
     }
-
+    
     private func buttonCenterY(in contentHeight: CGFloat) -> CGFloat {
-        runner.isRunning ? 110 : (contentHeight / 2)
+        runner.isRunning ? 105 : (contentHeight / 2) // Moved up to 105 to maximize peer list space
     }
+    
+    // MARK: - SpeedCard Component
+    struct SpeedCard: View {
+        let title: String
+        let value: String // e.g. "133.3 KB/s"
+        let icon: String
+        let color: Color
+        let history: [Double]
+        let maxVal: Double
+        let isVisible: Bool
+        
+        // Helper to split value and unit
+        private var splitValue: (number: String, unit: String) {
+            let components = value.components(separatedBy: " ")
+            if components.count >= 2 {
+                return (components[0], components[1])
+            }
+            return (value, "")
+        }
+        
+        var body: some View {
+            ZStack(alignment: .bottom) {
+                // Content (Below the line but drawn first)
+                VStack(alignment: .leading, spacing: 2) {
+                    // Title (Left Aligned)
+                    HStack(spacing: 4) {
+                        Image(systemName: icon)
+                            .foregroundColor(color)
+                            .font(.system(size: 10, weight: .bold))
+                        Text(title)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(color.opacity(0.8))
+                    }
+                    .padding(.top, 10)
+                    
+                    Spacer()
+                    
+                    // Value (Split style - Centered)
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(splitValue.number)
+                            .font(.system(size: 24, weight: .bold, design: .monospaced)) // Larger & Bold
+                        Text(splitValue.unit)
+                            .font(.system(size: 11, weight: .bold, design: .monospaced)) // Changed to .bold
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    
+                    Spacer()
+                    
+                    Color.clear.frame(height: 12)
+                }
+                .padding(.horizontal, 12)
+                .zIndex(1) // Above background but below sparkline path if we want sparkline on VERY top
+                
+                // Sparkline (On top layer as requested)
+                // Sparkline (On top layer as requested)
+                // Sparkline (On top layer as requested)
+                Sparkline(data: history, color: color, maxScale: maxVal, paused: !isVisible)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity) // Fills the card
+                    .zIndex(10) // Top layer
+                    .allowsHitTesting(false) // Don't block interactions
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 85) // Reduced from 100 to 85 to fix crowding
+            .background(
+                RoundedRectangle(cornerRadius: 10) // Match PeerCard (10)
+                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(color.opacity(0.2), lineWidth: 1)
+            )
+            // Removed clipShape to allow pulse ripple to extend beyond card boundary
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.98)
+            // Use a smoother spring for the entire card presence
+            .animation(.spring(response: 0.8, dampingFraction: 0.8), value: isVisible)
+        }
+    }
+    
+    // MARK: - Sparkline Component (Swift Charts)
+    // MARK: - Sparkline Component
+    // MARK: - Sparkline Component
+    struct Sparkline: View {
+        let data: [Double]
+        let color: Color
+        let maxScale: Double
+        let paused: Bool
+        
+        var body: some View {
+            GeometryReader { geo in
+                AnimatableSparkline(data: data, color: color, currentMax: maxScale, paused: paused)
+                    .frame(width: geo.size.width + 60, height: geo.size.height + 60)
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: maxScale)
+            }
+        }
+    }
+    
+    struct AnimatableSparkline: View, Animatable {
+        let data: [Double]
+        let color: Color
+        var currentMax: Double
+        let paused: Bool
+        
+        var animatableData: Double {
+            get { currentMax }
+            set { currentMax = newValue }
+        }
+        
+        @State private var ghostValue: Double? = nil
+        @State private var lastUpdateTime: Date = Date()
+        
+        var body: some View {
+            Group {
+                if paused {
+                    Color.clear
+                } else {
+                    // Limit to 24fps to balance smoothness and CPU usage (User Request)
+                    TimelineView(.periodic(from: .now, by: 1.0 / 24.0)) { timeline in
+                        Canvas { context, size in
+                            let now = timeline.date
+                            // Calculate progress for smooth interpolation (1.0s interval)
+                            let refreshDuration: Double = 1.0
+                            let timeDiff = now.timeIntervalSince(lastUpdateTime)
+                            let progress = min(timeDiff / refreshDuration, 1.0)
+                            
+                            guard data.count > 1 else { return }
+                            
+                            let overflow: CGFloat = 60.0
+                            let shift = overflow / 2.0
+                            
+                            // Shift coordinate system
+                            context.translateBy(x: shift, y: shift)
+                            
+                            let w = size.width - overflow
+                            let h = size.height - overflow
+                            let rightPadding: CGFloat = 10.0
+                            let innerWidth = w - rightPadding
+                            
+                            let range = max(currentMax, 0.001)
+                            let stepX = innerWidth / CGFloat(data.count - 1)
+                            
+                            // Layout constants
+                            let strokeWidth: CGFloat = 2.5
+                            let bottomBuffer: CGFloat = strokeWidth / 2.0 + 0.5
+                            let topBuffer: CGFloat = 8.0
+                            let availableHeight = h - bottomBuffer - topBuffer
+
+                            // 1. Prepare Base Points
+                            var points = data.enumerated().map { (i, val) -> CGPoint in
+                                let x = CGFloat(i) * stepX
+                                let y = h - bottomBuffer - (CGFloat(val / range) * availableHeight)
+                                return CGPoint(x: x, y: y)
+                            }
+                            
+                            // 2. Apply "Growth" to the last point (Y-axis vertical interpolation)
+                            if points.count >= 2 {
+                                let lastIndex = points.count - 1
+                                let secondLastY = points[lastIndex - 1].y
+                                let targetY = points[lastIndex].y
+                                let currentY = secondLastY + (targetY - secondLastY) * CGFloat(progress)
+                                points[lastIndex].y = currentY
+                            }
+                            
+                            // 3. Continuous Scroll Offset (Right to Left horizontal interpolation)
+                            let scrollOffset = (1.0 - progress) * stepX
+                            
+                            context.withCGContext { cgContext in
+                                var path = Path()
+                                
+                                // 4. Ghost Point (Left edge seamless fill)
+                                let firstY = points.first?.y ?? (h - bottomBuffer)
+                                let ghostValY = ghostValue.map { h - bottomBuffer - (CGFloat($0 / range) * availableHeight) }
+                                let startY = ghostValY ?? firstY
+                                
+                                path.move(to: CGPoint(x: -stepX, y: startY))
+                                if !points.isEmpty {
+                                    path.addLine(to: points[0])
+                                }
+                                
+                                // 5. History Line
+                                for i in 1..<(points.count - 1) {
+                                    let p1 = points[i-1]
+                                    let p2 = points[i]
+                                    path.addLine(to: p2)
+                                }
+                                
+                                // 6. Anchored Tip
+                                if let lastIdx = points.indices.last {
+                                    points[lastIdx].x -= scrollOffset
+                                    path.addLine(to: points[lastIdx])
+                                }
+                                
+                                var fillPath = path
+                                fillPath.addLine(to: CGPoint(x: points.last!.x, y: h))
+                                fillPath.addLine(to: CGPoint(x: ghostValue != nil ? -stepX : 0, y: h))
+                                fillPath.closeSubpath()
+                                
+                                // Content Drawing
+                                var contentContext = context
+                                let cardPath = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: 10)
+                                contentContext.clip(to: cardPath)
+                                contentContext.translateBy(x: scrollOffset, y: 0)
+                                
+                                // Gradient Fill
+                                contentContext.fill(fillPath, with: .linearGradient(
+                                    Gradient(colors: [color.opacity(0.3), color.opacity(0)]),
+                                    startPoint: .zero, endPoint: CGPoint(x: 0, y: h)
+                                ))
+                                
+                                // Stroke Line
+                                contentContext.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
+                                
+                                // 7. Hotspot & Pulse (Outside Clip)
+                                context.withCGContext { _ in
+                                     context.translateBy(x: scrollOffset, y: 0)
+                                     
+                                    if let lastPoint = points.last {
+                                        let t = now.timeIntervalSinceReferenceDate
+                                        let pulseDuration: Double = 0.8
+                                        let pulseProg = (t.truncatingRemainder(dividingBy: pulseDuration)) / pulseDuration
+                                        let rippleRadius = 4.0 + (12.0 * pulseProg)
+                                        let rippleOpacity = 0.4 * (1.0 - pulseProg)
+                                        
+                                        // Ripple
+                                        context.stroke(
+                                            Path(ellipseIn: CGRect(x: lastPoint.x - rippleRadius, y: lastPoint.y - rippleRadius, 
+                                                                  width: rippleRadius * 2, height: rippleRadius * 2)),
+                                            with: .color(color.opacity(rippleOpacity)),
+                                            lineWidth: 1.5
+                                        )
+                                        
+                                        // Dot
+                                        let dotSize: CGFloat = 8.0
+                                        let dotRect = CGRect(x: lastPoint.x - dotSize/2, y: lastPoint.y - dotSize/2, width: dotSize, height: dotSize)
+                                        
+                                        context.drawLayer { innerContext in
+                                            innerContext.addFilter(.shadow(color: color.opacity(0.4), radius: 3))
+                                            innerContext.fill(Path(ellipseIn: dotRect), with: .color(color))
+                                            innerContext.stroke(Path(ellipseIn: dotRect), with: .color(.white), lineWidth: 1.5)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .drawingGroup() // Metal Acceleration
+                    }
+                }
+            }
+            .onChange(of: data) { newData in
+                if let first = data.first {
+                    ghostValue = first
+                }
+                lastUpdateTime = Date()
+            }
+            .onAppear {
+                if let first = data.first { ghostValue = first }
+            }
+        }
+    }
+    
     
     // MARK: - Helper Functions
     
@@ -499,12 +768,12 @@ struct StartStopButtonCore: View {
 
             if isRunning {
                 Text(uptimeText)
-                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 22, weight: .bold, design: .monospaced)) // Increased size & weight
                     .foregroundColor(.primary)
-                    .frame(width: 120)
+                    .frame(width: 140)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .offset(y: -70)
+                    .offset(y: -85) // Rebalanced offset to match the new dashboard position
             }
         }
         .frame(width: 84, height: 84)
@@ -524,22 +793,27 @@ struct RippleRings: View {
         colorScheme == .light ? 0.9 : 0.1
     }
 
-    @ViewBuilder
     var body: some View {
-        // 关键优化：只在可见时才渲染 TimelineView，避免不必要的帧计算
-        if isVisible {
-            TimelineView(.animation) { timeline in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let phase = (t.truncatingRemainder(dividingBy: duration)) / duration
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let phase = (t.truncatingRemainder(dividingBy: duration)) / duration
+            
+            // Calculate progress for each ring
+            let p0 = phaseShifted(phase, by: 0.0)
+            let p1 = phaseShifted(phase, by: 1.0 / 3.0)
+            let p2 = phaseShifted(phase, by: 2.0 / 3.0)
+            
+            // Sort by progress descending (Largest -> Smallest) so large rings are in back
+            let sortedProgress = [p0, p1, p2].sorted(by: >)
 
-                ZStack {
-                    ring(progress: phaseShifted(phase, by: 0.0))
-                    ring(progress: phaseShifted(phase, by: 1.0 / 3.0))
-                    ring(progress: phaseShifted(phase, by: 2.0 / 3.0))
+            ZStack {
+                ForEach(sortedProgress.indices, id: \.self) { i in
+                   ring(progress: sortedProgress[i])
                 }
             }
-            .transition(.opacity.animation(.easeInOut(duration: 0.5)))
         }
+        .opacity(isVisible ? 1.0 : 0.0)
+        .animation(.easeInOut(duration: 0.5), value: isVisible)
     }
 
     // phaseShifted 和 ring 保持完全不变
@@ -549,96 +823,18 @@ struct RippleRings: View {
     }
 
     private func ring(progress: Double) -> some View {
-        let scale = 0.2 + CGFloat(progress) * (maxScale - 0.2)
+        let scale = CGFloat(progress) * (maxScale - 1.0) + 1.0 // Start from button size (scale 1.0) to maxScale
         let opacity = baseOpacity * (1.0 - progress)
 
         return Circle()
             .fill(Color.white)
+            .frame(width: 84, height: 84) // Match button size
             .scaleEffect(scale)
             .opacity(opacity)
     }
 }
 
-struct DownloadingView: View {
-    @ObservedObject var downloader: CoreDownloader
-    @State private var errorText: String?
-    
-    var body: some View {
-        ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-            
-            VStack(spacing: 24) {
-                Image(systemName: "cube.box.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                
-                if downloader.isDownloading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text(downloader.statusMessage)
-                            .font(.headline)
-                        Text("请保持网络连接")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    VStack(spacing: 12) {
-                        Text("缺少内核组件")
-                            .font(.title2.bold())
-                        Text("Swiftier 需要核心二进制文件才能运行。\n请选择下载方式从 GitHub 获取并安装。")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                        
-                        if let err = errorText {
-                            Text("错误: \(err)")
-                                .foregroundColor(.red)
-                                .font(.caption)
-                        }
-                        
-                        VStack(spacing: 10) {
-                            Button("GitHub 加速安装 (推荐)") {
-                                installCore(useProxy: true)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            
-                            Button("GitHub 直连安装") {
-                                installCore(useProxy: false)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
-                        }
-                        
-                        Button("退出 Swiftier") {
-                            NSApplication.shared.terminate(nil)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 8)
-                    }
-                }
-            }
-            .padding(40)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(nsColor: .windowBackgroundColor)))
-            .shadow(radius: 20)
-            .frame(width: 380)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    
-    private func installCore(useProxy: Bool) {
-        Task {
-            do {
-                errorText = nil
-                try await downloader.installCore(useProxy: useProxy)
-                downloader.objectWillChange.send()
-            } catch {
-                errorText = error.localizedDescription
-            }
-        }
-    }
-}
+
 
 struct FDAGuideView: View {
     @Binding var isPresented: Bool

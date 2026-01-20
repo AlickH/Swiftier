@@ -225,6 +225,92 @@ class LogParser: ObservableObject {
     private let maxFullTextLength = 20000 // 20KB per entry max
     private let maxLogItems = 1000 // Increased to prevent UI jumping when scrolling (removing items causes shift)
     private let maxEventItems = 200
+    
+    // Track seen events to avoid duplicates when using get_running_info
+    private var seenEventHashes: Set<Int> = []
+    
+    /// Update events from get_running_info response (like EasyTier-iOS)
+    /// The events array from running info contains JSON strings
+    func updateEventsFromRunningInfo(_ eventsArray: [String]) {
+        var newEvents: [EventEntry] = []
+        
+        for jsonStr in eventsArray {
+            // Use hash to track duplicates
+            let hash = jsonStr.hashValue
+            if seenEventHashes.contains(hash) { continue }
+            seenEventHashes.insert(hash)
+            
+            // Parse the JSON event
+            if let event = parseRunningInfoEvent(jsonStr) {
+                newEvents.append(event)
+            }
+        }
+        
+        guard !newEvents.isEmpty else { return }
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.events.append(contentsOf: newEvents)
+            // Sort by date (newest first) and limit
+            self.events.sort { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            if self.events.count > self.maxEventItems {
+                self.events = Array(self.events.prefix(self.maxEventItems))
+            }
+            self.saveEvents()
+            
+            // Limit seen hashes to prevent memory growth
+            if self.seenEventHashes.count > 5000 {
+                self.seenEventHashes.removeAll()
+                // Re-add current events
+                for event in self.events {
+                    self.seenEventHashes.insert(event.details.hashValue)
+                }
+            }
+        }
+    }
+    
+    /// Parse a single event JSON string from get_running_info
+    private func parseRunningInfoEvent(_ jsonStr: String) -> EventEntry? {
+        guard let data = jsonStr.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        
+        // Extract time
+        var eventTime = ""
+        var eventDate: Date?
+        if let timeStr = json["time"] as? String {
+            eventTime = timeStr.replacingOccurrences(of: "Z", with: "")
+            eventDate = parseEventDate(timeStr)
+        }
+        
+        // Extract event type and payload
+        var eventType: EventEntry.EventType?
+        var eventPayload: Any?
+        
+        if let eventData = json["event"] {
+            if let eventDict = eventData as? [String: Any], let key = eventDict.keys.first {
+                eventType = mapEventType(key)
+                eventPayload = eventDict[key]
+            } else if let eventStr = eventData as? String {
+                eventType = mapEventType(eventStr)
+                eventPayload = eventStr
+            }
+        }
+        
+        guard let type = eventType else { return nil }
+        
+        let cleanedPayload = recursiveJsonClean(eventPayload, depth: 0)
+        let detailsStr = capString(formatAsJson(cleanedPayload), limit: maxFullTextLength)
+        
+        return EventEntry(
+            timestamp: eventTime,
+            date: eventDate,
+            type: type,
+            details: detailsStr
+        )
+    }
+
 
     func startMonitoring() {
         // Restore events from disk to memory
@@ -829,26 +915,34 @@ class LogParser: ObservableObject {
     
     private func formatAsJson(_ value: Any?) -> String {
         guard let value = value else { return "null" }
+        
+        // JSONSerialization requires Array or Dictionary as top-level type.
+        // If it's a simple type, just return its string representation.
+        if !(value is [String: Any]) && !(value is [Any]) {
+            return "\(value)"
+        }
+        
         var options: JSONSerialization.WritingOptions = [.prettyPrinted]
         if #available(macOS 10.15, *) {
             options.insert(.withoutEscapingSlashes)
         }
         
         if let data = try? JSONSerialization.data(withJSONObject: value, options: options),
-           var str = String(data: data, encoding: .utf8) {
+           let str = String(data: data, encoding: .utf8) {
+            var res = str
             
             // Compact simple arrays (e.g., lists of strings/numbers) to single line
             // Matches [ content ] where content doesn't contain { or [ (nested structures)
             let pattern = "\\[\\s*([^\\{\\[\\]]*?)\\s*\\]"
             if let regex = try? NSRegularExpression(pattern: pattern, options: .dotMatchesLineSeparators) {
                 // Find all matches
-                let range = NSRange(location: 0, length: str.utf16.count)
-                let matches = regex.matches(in: str, options: [], range: range)
+                let range = NSRange(location: 0, length: res.utf16.count)
+                let matches = regex.matches(in: res, options: [], range: range)
                 
                 // Process in reverse to avoid invalidating ranges
                 for match in matches.reversed() {
-                    if let contentRange = Range(match.range(at: 1), in: str) {
-                        let content = String(str[contentRange])
+                    if let contentRange = Range(match.range(at: 1), in: res) {
+                        let content = String(res[contentRange])
                         // Collapse whitespace: split by newline and rejoin with space
                         let collapsed = content
                             .components(separatedBy: .newlines)
@@ -856,15 +950,16 @@ class LogParser: ObservableObject {
                             .joined(separator: " ")
                             .trimmingCharacters(in: .whitespaces)
                         
-                        if let fullRange = Range(match.range, in: str) {
-                            str.replaceSubrange(fullRange, with: "[\(collapsed)]")
+                        let fullMatchRange = match.range(at: 0)
+                        if let targetRange = Range(fullMatchRange, in: res) {
+                            res.replaceSubrange(targetRange, with: "[\(collapsed)]")
                         }
                     }
                 }
             }
             
             // Unescape characters for better human readability in the log view
-            return str
+            return res
                 .replacingOccurrences(of: "\\n", with: "\n")
                 .replacingOccurrences(of: "\\\"", with: "\"")
                 .replacingOccurrences(of: "\\t", with: "\t")
@@ -1149,15 +1244,6 @@ struct LogDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            UnifiedHeader(title: "Log Detail") {
-                Button("关闭") {
-                    log = nil
-                }
-                .buttonStyle(.bordered)
-            } right: {
-                EmptyView()
-            }
-            
             if let entry = log {
                 CodeEditor(text: .constant(entry.fullText), mode: .log, isEditable: false)
             }
