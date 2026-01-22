@@ -215,8 +215,12 @@ class LogParser: ObservableObject {
     }
     
     private func saveEvents() {
-        if let data = try? JSONEncoder().encode(events) {
-            try? data.write(to: eventsFileURL)
+        let eventsToSave = self.events
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self = self else { return }
+            if let data = try? JSONEncoder().encode(eventsToSave) {
+                try? data.write(to: self.eventsFileURL)
+            }
         }
     }
 
@@ -235,19 +239,28 @@ class LogParser: ObservableObject {
     // Track seen events to avoid duplicates when using get_running_info
     private var seenEventHashes: Set<Int> = []
     
+    // Standard ISO8601 parser as used in iOS/Core
+    private let iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    
     /// Update events from get_running_info response (like EasyTier-iOS)
     /// The events array from running info contains JSON strings
-    func updateEventsFromRunningInfo(_ eventsArray: [String]) {
+    /// Update events from get_running_info response
+    func updateEventsFromRunningInfo(_ eventsAnyArray: [Any]) {
         var newEvents: [EventEntry] = []
         
-        for jsonStr in eventsArray {
-            // Use hash to track duplicates
-            let hash = jsonStr.hashValue
+        for item in eventsAnyArray {
+            // Use hash of the raw item description to track duplicates
+            let itemDesc = "\(item)"
+            let hash = itemDesc.hashValue
             if seenEventHashes.contains(hash) { continue }
             seenEventHashes.insert(hash)
             
-            // Parse the JSON event
-            if let event = parseRunningInfoEvent(jsonStr) {
+            // Safe parsing
+            if let event = parseEventEntry(from: item) {
                 newEvents.append(event)
             }
         }
@@ -275,42 +288,44 @@ class LogParser: ObservableObject {
         }
     }
     
-    /// Parse a single event JSON string from get_running_info
-    private func parseRunningInfoEvent(_ jsonStr: String) -> EventEntry? {
-        guard let data = jsonStr.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+    /// Robust parsing from either a JSON String or a Dictionary
+    private func parseEventEntry(from input: Any) -> EventEntry? {
+        let json: [String: Any]?
+        
+        if let dict = input as? [String: Any] {
+            json = dict
+        } else if let str = input as? String, let data = str.data(using: .utf8) {
+            json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        } else {
             return nil
         }
         
-        // Extract time
-        var eventTime = ""
-        var eventDate: Date?
-        if let timeStr = json["time"] as? String {
-            eventTime = timeStr.replacingOccurrences(of: "Z", with: "")
-            eventDate = parseEventDate(timeStr)
+        guard let json = json else { return nil }
+        
+        let timeStr = json["time"] as? String ?? ""
+        let eventDate = iso8601Formatter.date(from: timeStr)
+        let displayTimestamp = timeStr.replacingOccurrences(of: "Z", with: "").replacingOccurrences(of: "T", with: " ")
+        
+        guard let eventData = json["event"] else { return nil }
+        
+        let eventName: String?
+        let eventPayload: Any
+        
+        if let eventDict = eventData as? [String: Any], eventDict.count == 1, 
+           let firstKey = eventDict.keys.first {
+            eventName = firstKey
+            eventPayload = eventDict[firstKey] ?? eventData
+        } else {
+            eventName = eventData as? String
+            eventPayload = eventData
         }
         
-        // Extract event type and payload
-        var eventType: EventEntry.EventType?
-        var eventPayload: Any?
-        
-        if let eventData = json["event"] {
-            if let eventDict = eventData as? [String: Any], let key = eventDict.keys.first {
-                eventType = mapEventType(key)
-                eventPayload = eventDict[key]
-            } else if let eventStr = eventData as? String {
-                eventType = mapEventType(eventStr)
-                eventPayload = eventStr
-            }
-        }
-        
-        guard let type = eventType else { return nil }
-        
+        let type = mapEventType(eventName ?? "unknown")
         let cleanedPayload = recursiveJsonClean(eventPayload, depth: 0)
-        let detailsStr = capString(formatAsJson(cleanedPayload), limit: maxFullTextLength)
+        let detailsStr = formatAsJson(cleanedPayload)
         
         return EventEntry(
-            timestamp: eventTime,
+            timestamp: displayTimestamp,
             date: eventDate,
             type: type,
             details: detailsStr
@@ -398,8 +413,8 @@ class LogParser: ObservableObject {
             
             // Parse JSON events and add to events list
             var newEvents: [EventEntry] = []
-            for jsonStr in jsonEvents {
-                if let event = self.parseXPCJsonEvent(jsonStr) {
+            for item in jsonEvents {
+                if let event = self.parseEventEntry(from: item) {
                     newEvents.append(event)
                 }
             }
@@ -418,46 +433,6 @@ class LogParser: ObservableObject {
         }
     }
     
-    /// Parse a JSON event string from XPC into an EventEntry
-    private func parseXPCJsonEvent(_ jsonStr: String) -> EventEntry? {
-        guard let data = jsonStr.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        
-        var eventTime = ""
-        var eventType: EventEntry.EventType?
-        var eventPayload: Any?
-        
-        if let timeStr = json["time"] as? String {
-            eventTime = timeStr.replacingOccurrences(of: "Z", with: "")
-        }
-        
-        if let eventData = json["event"] {
-            if let eventDict = eventData as? [String: Any], let key = eventDict.keys.first {
-                eventType = mapEventType(key)
-                eventPayload = eventDict[key]
-            } else if let eventStr = eventData as? String {
-                eventType = mapEventType(eventStr)
-                eventPayload = eventStr
-            }
-        }
-        
-        guard let type = eventType else { return nil }
-        
-        let cleanedPayload = recursiveJsonClean(eventPayload, depth: 0)
-        let detailsStr = capString(formatAsJson(cleanedPayload), limit: maxFullTextLength)
-        
-        // Parse date
-        let date = parseEventDate(eventTime)
-        
-        return EventEntry(
-            timestamp: eventTime,
-            date: date,
-            type: type,
-            details: detailsStr
-        )
-    }
     
     private func parseEventDate(_ ts: String) -> Date? {
         let formats = [
@@ -618,32 +593,9 @@ class LogParser: ObservableObject {
                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     
                     var eventTime = ""
-                    var eventType: EventEntry.EventType?
-                    var eventPayload: Any?
-                    
-                    if let timeStr = json["time"] as? String {
-                         eventTime = timeStr.replacingOccurrences(of: "Z", with: "")
-                    }
-                    
-                    if let eventData = json["event"] {
-                        if let eventDict = eventData as? [String: Any], let key = eventDict.keys.first {
-                            eventType = mapEventType(key)
-                            eventPayload = eventDict[key]
-                        } else if let eventStr = eventData as? String {
-                            eventType = mapEventType(eventStr)
-                            eventPayload = eventStr
-                        }
-                    }
-                    
-                    if let type = eventType {
-                        let cleanedPayload = recursiveJsonClean(eventPayload, depth: 0)
-                        let detailsStr = capString(formatAsJson(cleanedPayload), limit: maxFullTextLength)
-                        newEvents.append(EventEntry(
-                            timestamp: eventTime,
-                            date: localParseDate(eventTime),
-                            type: type, 
-                            details: detailsStr
-                        ))
+                    if let event = self.parseEventEntry(from: json) {
+                        newEvents.append(event)
+                        eventTime = event.timestamp
                     }
                     
                     newEntries.append(LogEntry(
@@ -921,7 +873,24 @@ class LogParser: ObservableObject {
     private func recursiveJsonClean(_ value: Any?, depth: Int) -> Any? {
         guard let value = value, depth < 5 else { return value }
         
+        // 1. Check for Peer ID pattern in strings (Added/Removed/Lost)
+        // Matches: PeerAdded(123456) or PeerRemoved(123456)
+        if let str = value as? String {
+            let pattern = #"(?:PeerAdded|PeerRemoved|PeerLost)\((\d+)\)"#
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: str, range: NSRange(str.startIndex..., in: str)),
+               let range = Range(match.range(at: 1), in: str) {
+                return String(str[range])
+            }
+        }
+        
         if let dict = value as? [String: Any] {
+            // Special Case: Simplification for core logs that wrap IDs in a 'raw' field
+            if let rawMatch = dict["raw"] as? String, 
+               let id = extractPeerId(from: rawMatch) {
+                return id
+            }
+            
             var newDict = dict
             for (k, v) in dict {
                 newDict[k] = recursiveJsonClean(v, depth: depth + 1)
@@ -942,6 +911,16 @@ class LogParser: ObservableObject {
         return value
     }
     
+    private func extractPeerId(from text: String) -> String? {
+        let pattern = #"(?:PeerAdded|PeerRemoved|PeerLost)\((\d+)\)"#
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let range = Range(match.range(at: 1), in: text) {
+            return String(text[range])
+        }
+        return nil
+    }
+
     private func mapEventType(_ name: String) -> EventEntry.EventType {
         switch name {
         case "Connecting", "ConnectingTo": return .connecting
@@ -958,6 +937,7 @@ class LogParser: ObservableObject {
         }
     }
     
+    // Fixed recursiveJsonClean bug where it didn't pass through self correctly in nested scopes
     private func extractUrl(from text: String) -> String? {
         if let range = text.range(of: "tcp://") ?? text.range(of: "udp://") ?? text.range(of: "wg://") {
             let start = text.index(range.lowerBound, offsetBy: 0)
@@ -976,7 +956,7 @@ class LogParser: ObservableObject {
             return "\(value)"
         }
         
-        var options: JSONSerialization.WritingOptions = [.prettyPrinted]
+        var options: JSONSerialization.WritingOptions = [.prettyPrinted, .fragmentsAllowed]
         if #available(macOS 10.15, *) {
             options.insert(.withoutEscapingSlashes)
         }
@@ -1078,8 +1058,8 @@ struct EventListView: View {
                                             .foregroundColor(.secondary)
                                     } else {
                                         // Fallback
-                                        Text(event.timestamp.prefix(8))
-                                            .font(.system(size: 14, weight: .bold))
+                                        Text(event.timestamp)
+                                            .font(.system(size: 10, weight: .bold))
                                             .foregroundColor(.secondary)
                                     }
                                 }
@@ -1143,8 +1123,9 @@ struct EventListView: View {
                     } label: {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 20, weight: .bold))
+                            .modifier(GlassButtonModifier()) // 应用于 label
                     }
-                    .modifier(GlassButtonModifier())
+                    .buttonStyle(.plain)
                     .padding(16)
                     .help("回到顶部")
                 }
@@ -1199,10 +1180,10 @@ struct LogListView: View {
     }
     
     var body: some View {
-        ScrollViewReader { proxy in
-            ZStack(alignment: .bottomTrailing) {
-                HStack(spacing: 0) {
-                    // Sidebar List
+        HStack(spacing: 0) {
+            // Sidebar List Area (With its own ScrollToTop)
+            ScrollViewReader { proxy in
+                ZStack(alignment: .bottomTrailing) {
                     List {
                         ForEach(Array(filteredLogs.reversed().enumerated()), id: \.element.id) { index, log in
                             LogListRow(log: log, timestampFormatted: formatTimestamp(log.timestamp), isSelected: selectedLog?.id == log.id)
@@ -1212,63 +1193,66 @@ struct LogListView: View {
                                         selectedLog = (selectedLog?.id == log.id) ? nil : log
                                     }
                                 }
-                                .listRowSeparator(.hidden) // Cleaner zebra look
-                                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 0)) 
                                 .listRowBackground(
                                     ZStack {
                                         if selectedLog?.id == log.id {
                                             Color.blue.opacity(0.15)
                                         } else if index % 2 == 1 {
-                                            Color.primary.opacity(0.03) // Subtle zebra stripe
+                                            Color.primary.opacity(0.03)
                                         } else {
-                                            Color.clear
+                                            Color(nsColor: .textBackgroundColor)
                                         }
                                     }
+                                    .padding(.horizontal, -20)
                                 )
                                 .id(log.id)
                         }
                     }
-                    .listStyle(.sidebar)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                     .background(Color(nsColor: .textBackgroundColor))
-                    .frame(width: selectedLog == nil ? nil : 180) // Collapse to sidebar width when detail is open
                     
-                    // Detail Column (The "Systems Settings" Style Detail)
-                    if let entry = selectedLog {
-                        Divider()
-                        VStack(spacing: 0) {
-                            LogDetailView(log: .constant(entry))
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                    // Floating Button (Limited to this column)
+                    if filteredLogs.count > 5 {
+                        Button {
+                            if let topLog = filteredLogs.last {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    proxy.scrollTo(topLog.id, anchor: .top)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 16, weight: .bold)) // Slightly smaller for sidebar
+                                .modifier(GlassButtonModifier())
                         }
-                        .frame(maxWidth: .infinity)
-                        .background(Color(nsColor: .windowBackgroundColor))
+                        .buttonStyle(.plain)
+                        .padding(12)
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
-                .id("log-list-stable")
-                .onChange(of: selectedLog) { val in
-                    // When inspecting a log, pause UI updates to prevent the anchored row from shifting/jumping
-                    if val != nil {
-                        LogParser.shared.isPaused = true
-                    } else {
-                        LogParser.shared.isPaused = false
-                        LogParser.shared.flushPending()
-                    }
+            }
+            .frame(width: selectedLog == nil ? 420 : 180)
+            
+            // Detail Column
+            if let entry = selectedLog {
+                Divider()
+                VStack(spacing: 0) {
+                    LogDetailView(log: .constant(entry))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
-                
-                // Floating "Scroll to Top" Button with Liquid Glass effect (macOS 26+)
-                Button {
-                    // Since we use .reversed(), the first item in UI is filteredLogs.last
-                    if let topLog = filteredLogs.last {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(topLog.id, anchor: .top)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 20, weight: .bold))
-                }
-                .modifier(GlassButtonModifier())
-                .padding(16)
-                .help("回到顶部")
+                .frame(maxWidth: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
+            }
+        }
+        .id("log-list-stable")
+        .onChange(of: selectedLog) { val in
+            if val != nil {
+                LogParser.shared.isPaused = true
+            } else {
+                LogParser.shared.isPaused = false
+                LogParser.shared.flushPending()
             }
         }
     }
@@ -1290,7 +1274,7 @@ struct LogListRow: View {
             // Bottom Bar: Time | Level Tag
             HStack(spacing: 4) {
                 // Time
-                Text(timestampFormatted.suffix(8)) // Show only time to save space in sidebar
+                Text(timestampFormatted)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(.secondary)
                 
@@ -1306,7 +1290,8 @@ struct LogListRow: View {
             }
         }
         .contentShape(Rectangle())
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
+        .frame(minHeight: 64, maxHeight: 64) // 🔒 关键：强制固定行高，防止 .plain 变得松散
     }
 }
 
@@ -1350,8 +1335,7 @@ struct GlassButtonModifier: ViewModifier {
                     .fill(Color.blue) // 使用系统标准蓝色
                     .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2) // 经典悬浮阴影
             )
-            .contentShape(Circle())
-            .buttonStyle(.plain)
+            .contentShape(Circle()) // 关键：确保整个圆圈都是热区
             // 添加简单的悬停变色效果（可选，提升交互感）
             .onHover { isHovering in
                 if isHovering {

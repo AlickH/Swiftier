@@ -11,15 +11,30 @@ final class EasyTierRunner: ObservableObject {
     @Published var peerCount: String = "0"
     @Published var downloadSpeed: String = "0 KB/s"
     @Published var uploadSpeed: String = "0 KB/s"
-    @Published var isWindowVisible = true // 新增：全局追踪窗口可见性，优化后台 CPU
+    // 优化：窗口可见性变化时自动管理 Timer
+    @Published var isWindowVisible = true {
+        didSet {
+            guard oldValue != isWindowVisible else { return }
+            if isWindowVisible {
+                // 窗口显示，恢复 Timer
+                if isRunning {
+                    startUptimeTimer()
+                }
+            } else {
+                // 窗口隐藏，暂停 uptimeTimer（减少后台 CPU）
+                stopUptimeTimer()
+            }
+        }
+    }
 
     @Published var uptimeText: String = "00:00:00"
     
     private var startedAt: Date?
     
-    private var uptimeTimer: AnyCancellable?
     private var timer: AnyCancellable?
     
+    @Published private(set) var sessionID = UUID()
+
     private var currentSessionID = UUID()
     private var lastConfigPath: String?
     
@@ -184,7 +199,7 @@ final class EasyTierRunner: ObservableObject {
             // STOP
             self.startedAt = nil
             self.uptimeText = "00:00:00"
-            self.uptimeTimer?.cancel()
+            self.stopUptimeTimer()
             self.timer?.cancel()
             
             CoreService.shared.stop { [weak self] _ in
@@ -199,6 +214,7 @@ final class EasyTierRunner: ObservableObject {
             self.startUptimeTimer()
             
             let newSessionID = UUID()
+            self.sessionID = newSessionID
             self.currentSessionID = newSessionID
             self.lastConfigPath = configPath
             
@@ -249,6 +265,7 @@ final class EasyTierRunner: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 guard let self = self else { return }
                 let newSessionID = UUID()
+                self.sessionID = newSessionID
                 self.currentSessionID = newSessionID
                 self.performStart(configPath: path, newSessionID: newSessionID)
             }
@@ -300,6 +317,12 @@ final class EasyTierRunner: ObservableObject {
     }
 
     private func processRunningInfo(_ jsonStr: String) {
+        // 静默模式：窗口隐藏时跳过所有处理，只保留时间戳以便恢复时计算
+        guard isWindowVisible else {
+            lastPollTime = Date()
+            return
+        }
+        
         let now = Date()
         guard let data = jsonStr.data(using: .utf8) else { return }
         
@@ -307,21 +330,6 @@ final class EasyTierRunner: ObservableObject {
         var totalTx = 0
         var fetchedPeers: [PeerInfo] = []
         
-        if !isWindowVisible {
-            // --- 静默模式：极致性能，仅解析字节数用于图表连贯性 ---
-            if let mini = try? jsonDecoder.decode(MinimalStatus.self, from: data), let pairs = mini.peer_route_pairs {
-                for pair in pairs {
-                    if let conns = pair.peer?.conns {
-                        for conn in conns {
-                            if let s = conn.stats {
-                                totalRx += s.rx_bytes
-                                totalTx += s.tx_bytes
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
             // --- 活跃模式：全量解析并更新 UI ---
             guard let status = try? jsonDecoder.decode(EasyTierStatus.self, from: data) else { return }
             
@@ -363,13 +371,11 @@ final class EasyTierRunner: ObservableObject {
             
             // 4. 构建远程节点列表
             for pair in status.peerRoutePairs {
-                // peerId unused
                 var rxVal = "0 B", txVal = "0 B", latencyVal = "", lossVal = "", tunnelVal = ""
                 
                 if let peer = pair.peer {
                     var cRx = 0, cTx = 0, latSum = 0, latCount = 0, lossSum = 0.0, lossCount = 0, tunnels = Set<String>()
                     for conn in peer.conns {
-                        // Note: stats is optional in new model
                         if let s = conn.stats { 
                             latSum += s.latencyUs; latCount += 1
                             cRx += s.rxBytes; cTx += s.txBytes 
@@ -385,7 +391,6 @@ final class EasyTierRunner: ObservableObject {
                     if lossCount > 0 { lossVal = String(format: "%.1f%%", (lossSum/Double(lossCount))*100.0) }
                     tunnelVal = tunnels.sorted().joined(separator: "&")
                 } else if let pathLat = pair.route.pathLatency as Int?, pathLat > 0 {
-                    // New model has pathLatency as Int (us)
                      latencyVal = String(format: "%.1f", Double(pathLat) / 1000.0)
                 }
                 
@@ -399,20 +404,17 @@ final class EasyTierRunner: ObservableObject {
                     version: pair.route.version,
                     fullData: pair
                 ))
-            }
         }
         
-        // --- 全局流量更新 (无论可见性，保证历史图表平滑) ---
+        // --- 流量更新 ---
         if let lastT = lastPollTime {
             let d = now.timeIntervalSince(lastT)
             if d > 0.1 {
                 let rSpeed = max(0, Double(totalRx - lastTotalRx) / d)
                 let tSpeed = max(0, Double(totalTx - lastTotalTx) / d)
                 DispatchQueue.main.async {
-                    if self.isWindowVisible {
                         self.downloadSpeed = self.formatSpeed(rSpeed)
                         self.uploadSpeed = self.formatSpeed(tSpeed)
-                    }
                     self.downloadHistory.removeFirst(); self.downloadHistory.append(rSpeed)
                     self.uploadHistory.removeFirst(); self.uploadHistory.append(tSpeed)
                 }
@@ -421,9 +423,6 @@ final class EasyTierRunner: ObservableObject {
         self.lastTotalRx = totalRx
         self.lastTotalTx = totalTx
         self.lastPollTime = now
-        
-        // --- 性能分支：如果不可见，到此为止 ---
-        guard isWindowVisible else { return }
         
         // 5. 排序并发布 UI 列表
         let sorted = fetchedPeers.sorted { p1, p2 in
@@ -440,7 +439,17 @@ final class EasyTierRunner: ObservableObject {
         }
         
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) { self.peers = sorted }
+            let oldIDs = self.peers.map(\.id)
+            let newIDs = sorted.map(\.id)
+
+            if oldIDs != newIDs {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                    self.peers = sorted
+                }
+            } else {
+                self.peers = sorted
+            }
+
             self.peerCount = "\(sorted.count)"
         }
     }
@@ -464,15 +473,28 @@ final class EasyTierRunner: ObservableObject {
         return String(format: "%.2f GB", mb / 1024.0)
     }
 
+    private var uptimeTimer: Timer?
+    
     private func startUptimeTimer() {
-        uptimeTimer = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self = self, self.isWindowVisible, let sAt = self.startedAt else { return }
+        guard uptimeTimer == nil else { return }
+        updateUptimeText()
+        let t = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateUptimeText()
+        }
+        RunLoop.main.add(t, forMode: .common)
+        uptimeTimer = t
+    }
+    
+    private func stopUptimeTimer() {
+        uptimeTimer?.invalidate()
+        uptimeTimer = nil
+    }
+    
+    private func updateUptimeText() {
+        guard let sAt = startedAt else { return }
                 let interval = Int(Date().timeIntervalSince(sAt))
                 let h = interval / 3600; let m = (interval % 3600) / 60; let s = interval % 60
                 let newText = String(format: "%02d:%02d:%02d", h, m, s)
-                if self.uptimeText != newText { self.uptimeText = newText }
-        }
+        if uptimeText != newText { uptimeText = newText }
     }
 }

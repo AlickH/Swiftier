@@ -10,15 +10,24 @@ struct EasyTierControlApp: App {
     @AppStorage("breathEffect") private var breathEffect: Bool = true
     
     var body: some Scene {
-        // 使用 MenuBarExtra 获得原生液态玻璃窗口效果
         MenuBarExtra {
             ContentView()
         } label: {
-            // 根据状态动态切换图标
+            MenuBarLabelView(iconState: iconState)
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+// 优化：将 Label 提取为独立 View 隔离刷新
+struct MenuBarLabelView: View {
+    @ObservedObject var iconState: MenuBarIconState
+    
+    var body: some View {
+        HStack(spacing: 4) {
             Image(systemName: iconState.currentIcon)
                 .symbolRenderingMode(.hierarchical)
         }
-        .menuBarExtraStyle(.window)
     }
 }
 
@@ -35,30 +44,54 @@ class MenuBarIconState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     private init() {
-        // 监听运行状态变化
+        // 优化：监听运行状态变化，按需启停 Timer
         EasyTierRunner.shared.$isRunning
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isRunning in
-                self?.updateIcon(isRunning: isRunning)
+                self?.handleRunningStateChange(isRunning: isRunning)
             }
             .store(in: &cancellables)
         
-        // 启动定时器
-        startTimer()
+        // 监听 breathEffect 设置变化
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateTimerState()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func handleRunningStateChange(isRunning: Bool) {
+        updateIcon(isRunning: isRunning)
+        updateTimerState()
+    }
+    
+    private func updateTimerState() {
+        let isRunning = EasyTierRunner.shared.isRunning
+        let blinkEnabled = (UserDefaults.standard.object(forKey: "breathEffect") as? Bool) ?? true
+        
+        if isRunning && blinkEnabled {
+            startTimer()
+        } else {
+            stopTimer()
+        }
     }
     
     private func startTimer() {
+        // 优化：避免重复启动
+        guard animationTimer == nil else { return }
+        
         animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            let isRunning = EasyTierRunner.shared.isRunning
-            let blinkEnabled = (UserDefaults.standard.object(forKey: "breathEffect") as? Bool) ?? true
-            
-            if isRunning && blinkEnabled {
-                // 呼吸效果：切换实心/空心
-                self.isShowingFilled.toggle()
-                self.currentIcon = self.isShowingFilled ? self.iconFilled : self.iconOutline
-            }
+            // 呼吸效果：切换实心/空心
+            self.isShowingFilled.toggle()
+            self.currentIcon = self.isShowingFilled ? self.iconFilled : self.iconOutline
         }
+    }
+    
+    private func stopTimer() {
+        animationTimer?.invalidate()
+        animationTimer = nil
     }
     
     private func updateIcon(isRunning: Bool) {

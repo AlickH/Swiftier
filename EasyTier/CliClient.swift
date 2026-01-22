@@ -34,7 +34,8 @@ struct PeerInfo: Identifiable, Equatable {
     var myNodeData: EasyTierStatus.NodeInfo? = nil
     
     // 只要业务数据不变，SwiftUI 就不会在运行中刷新卡片视图（防止闪烁）
-    var id: String { "\(sessionID.uuidString)-\(ipv4)-\(hostname)-\(tunnel)" }
+    // 移除 tunnel，防止因为 P2P/Relay 切换导致 ID 变化引发重绘闪烁
+    var id: String { "\(sessionID.uuidString)-\(ipv4)-\(hostname)-\(nodeId ?? "")" }
 
     static func == (lhs: PeerInfo, rhs: PeerInfo) -> Bool {
         return lhs.ipv4 == rhs.ipv4 &&

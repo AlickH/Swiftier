@@ -129,11 +129,6 @@ struct CodeEditor: NSViewRepresentable {
         if textView.string != text {
             textView.string = text
             highlight(textView.textStorage!)
-            
-            // 自动滚动到底部
-            if mode == .log {
-                textView.scrollToEndOfDocument(nil)
-            }
         }
     }
     

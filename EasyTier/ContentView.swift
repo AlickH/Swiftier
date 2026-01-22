@@ -20,6 +20,11 @@ struct ContentView: View {
     private let windowWidth: CGFloat = 420
     private let windowHeight: CGFloat = 520
     
+    // 逻辑：判断当前是否有全屏覆盖层显示
+    private var isAnyOverlayShown: Bool {
+        showLogView || showSettingsView || showConfigGenerator || editingConfigURL != nil
+    }
+    
     var body: some View {
         ZStack {
             // 不再手动设置背景，利用 MenuBarExtra 原生窗口的 Vibrancy
@@ -39,8 +44,8 @@ struct ContentView: View {
             }
             
             // 日志全屏覆盖层
-            // 日志全屏覆盖层
-            if showLogView {
+            // 优化：窗口隐藏时不渲染覆盖层
+            if showLogView && runner.isWindowVisible {
                 LogView(isPresented: $showLogView)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)
@@ -51,7 +56,7 @@ struct ContentView: View {
             }
             
             // 设置全屏覆盖层
-            if showSettingsView {
+            if showSettingsView && runner.isWindowVisible {
                 SettingsView(isPresented: $showSettingsView)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)
@@ -60,7 +65,7 @@ struct ContentView: View {
             }
             
             // 编辑器全屏覆盖层
-            if let url = editingConfigURL {
+            if let url = editingConfigURL, runner.isWindowVisible {
                 ConfigEditorView(
                     isPresented: Binding(
                         get: { true },
@@ -74,17 +79,19 @@ struct ContentView: View {
                 .transition(.move(edge: .bottom))
             }
             
-            // 生成器全屏覆盖层 (Keep alive to persist draft state)
-            ConfigGeneratorView(
-                isPresented: $showConfigGenerator,
-                editingFileURL: selectedConfig,
-                onSave: { configManager.refreshConfigs() }
-            )
-            .id(selectedConfig) // Force reset state when config changes
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .zIndex(103)
-            .offset(y: showConfigGenerator ? 0 : windowHeight)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showConfigGenerator)
+            // 生成器全屏覆盖层
+            // 优化：只有显示时才创建，避免频繁初始化
+            if showConfigGenerator && runner.isWindowVisible {
+                ConfigGeneratorView(
+                    isPresented: $showConfigGenerator,
+                    editingFileURL: selectedConfig,
+                    onSave: { configManager.refreshConfigs() }
+                )
+                .id(selectedConfig)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .zIndex(103)
+                .transition(.move(edge: .bottom))
+            }
             
             // 新建配置弹窗
             if showCreatePrompt {
@@ -318,100 +325,42 @@ struct ContentView: View {
     private var contentArea: some View {
         GeometryReader { geo in
             ZStack {
-                // 1) 水波纹层 (放在最底层)
+                // 1) 水波纹层 (放在最底层) - UIKit 高性能实现
                 if runner.isRunning && runner.isWindowVisible {
-                    RippleRings(isVisible: true, duration: 4.0, maxScale: 5.5)
-                        .frame(width: 500, height: 500) // Increased frame to prevent Metal clipping
+                    RippleRingsView(isVisible: true, duration: 4.0, maxScale: 5.5)
+                        .frame(width: 500, height: 500)
                         .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
-                        .allowsHitTesting(false) // Prevent gesture interference with scrolling
+                        .allowsHitTesting(false)
+                        .transition(.opacity) // Fade in
                         .zIndex(0)
                 }
 
-                // 2) 节点列表区域 (Bottom Anchored)
-                if runner.isRunning && runner.isWindowVisible {
-                    VStack {
-                        Spacer()
-                        if !runner.peers.isEmpty {
-                            NativeHorizontalScroller {
-                                LazyHGrid(
-                                    rows: [
-                                        GridItem(.fixed(105), spacing: 8),
-                                        GridItem(.fixed(105), spacing: 8)
-                                    ],
-                                    spacing: 12
-                                ) {
-                                    ForEach(runner.peers) { peer in
-                                        PeerCard(peer: peer)
-                                            .frame(width: 188)
-                                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                            }
-                            .frame(height: 222)
-                            .padding(.bottom, 16)
-                            .zIndex(1)
-                        } else {
-                            VStack(spacing: 20) {
-                                ProgressView().scaleEffect(1.2).controlSize(.large)
-                                Text("节点加载中").font(.title3.bold()).foregroundColor(.secondary)
-                            }
-                            .frame(height: 222)
-                            .padding(.bottom, 16)
-                            .zIndex(1)
-                        }
-                    }
+                // 2) 节点列表区域 - 使用独立组件隔离刷新
+                if runner.isRunning && runner.isWindowVisible && !isAnyOverlayShown {
+                    PeerListArea()
+                        .id(runner.sessionID)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(1)
                 }
 
-                // 3) 启动按钮与网速仪表盘层
+                // 3) 启动按钮与网速仪表盘层 - 使用独立组件隔离刷新
                 if runner.isWindowVisible {
-                    HStack(spacing: -6) {
-                        let maxSpeed = max(
-                            (runner.downloadHistory.max() ?? 0.0),
-                            (runner.uploadHistory.max() ?? 0.0),
-                            1_048_576.0
-                        )
-                        
-                        SpeedCard(
-                            title: "DOWNLOAD",
-                            value: runner.downloadSpeed,
-                            icon: "arrow.down.square.fill",
-                            color: .blue,
-                            history: runner.downloadHistory,
-                            maxVal: maxSpeed,
-                            isVisible: runner.isRunning && runner.isWindowVisible
-                        )
-                        
-                        Button {
-                            let path = selectedConfig?.path ?? configManager.configFiles.first?.path ?? ""
-                            runner.toggleService(configPath: path)
-                        } label: {
-                            StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
-                        }
-                        .buttonStyle(.plain)
-                        .zIndex(20)
-                        
-                        SpeedCard(
-                            title: "UPLOAD",
-                            value: runner.uploadSpeed,
-                            icon: "arrow.up.square.fill",
-                            color: .orange,
-                            history: runner.uploadHistory,
-                            maxVal: maxSpeed,
-                            isVisible: runner.isRunning && runner.isWindowVisible
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(width: geo.size.width)
-                    .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
+                    SpeedDashboard(
+                        selectedConfigPath: selectedConfig?.path ?? configManager.configFiles.first?.path ?? "",
+                        geoSize: geo.size,
+                        buttonCenterY: buttonCenterY(in: geo.size.height),
+                        isPaused: isAnyOverlayShown
+                    )
                     .zIndex(10)
                 }
             }
             .animation(.spring(response: 1.0, dampingFraction: 0.8), value: runner.isRunning)
             .animation(.spring(response: 0.55, dampingFraction: 0.8), value: showLogView)
+            .blur(radius: isAnyOverlayShown ? 10 : 0)
+            .opacity(isAnyOverlayShown ? 0.3 : 1.0)
         }
     }
-
     
     private func buttonCenterY(in contentHeight: CGFloat) -> CGFloat {
         runner.isRunning ? 133 : (contentHeight / 2) // Centered between duration (Y=20) and peer cards (Y=234)
@@ -426,6 +375,7 @@ struct ContentView: View {
         let history: [Double]
         let maxVal: Double
         let isVisible: Bool
+        let isPaused: Bool // 新增：是否暂停
         
         // Helper to split value and unit
         private var splitValue: (number: String, unit: String) {
@@ -438,14 +388,13 @@ struct ContentView: View {
         
         var body: some View {
             ZStack(alignment: .bottom) {
-                // Sparkline (Background layer)
-                if isVisible {
-                    Sparkline(data: history, color: color, maxScale: maxVal, paused: !isVisible)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.top, 24)
-                        .zIndex(0)
-                        .allowsHitTesting(false)
-                }
+                // Sparkline (Background layer) - UIKit 高性能实现
+                // 当整体可见时，传入 paused=false
+                SparklineView(data: history, color: color, maxScale: maxVal, paused: isPaused)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, 24)
+                    .zIndex(0)
+                    .allowsHitTesting(false)
                 
                 // Content (Foreground layer - Floating above sparkline)
                 VStack(alignment: .leading, spacing: 2) {
@@ -468,10 +417,8 @@ struct ContentView: View {
                             .font(.system(size: 24, weight: .bold, design: .monospaced))
                         Text(splitValue.unit)
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            // Removed .foregroundColor(.secondary) to match number color
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1) // Optional: Added shadow for better legibility over sparkline
                     
                     Spacer()
                     
@@ -481,195 +428,266 @@ struct ContentView: View {
                 .zIndex(20)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 85) // Reduced from 100 to 85 to fix crowding
+            .frame(height: 85)
             .background(
-                RoundedRectangle(cornerRadius: 12) // Match PeerCard (12)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color(nsColor: .windowBackgroundColor).opacity(0.6))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(color.opacity(0.2), lineWidth: 1)
             )
-            // Removed clipShape to allow pulse ripple to extend beyond card boundary
-            .opacity(isVisible ? 1 : 0)
         }
     }
     
-    // MARK: - Sparkline Component (Swift Charts)
-    // MARK: - Sparkline Component
-    // MARK: - Sparkline Component
+    // MARK: - 速度仪表盘（独立组件，隔离频繁刷新）
+    struct SpeedDashboard: View {
+        let selectedConfigPath: String
+        let geoSize: CGSize
+        let buttonCenterY: CGFloat
+        let isPaused: Bool // 新增：是否暂停
+        
+        // 直接订阅 runner，只有这个组件会被频繁刷新
+        @ObservedObject private var runner = EasyTierRunner.shared
+        
+        var body: some View {
+            let maxSpeed = max(
+                (runner.downloadHistory.max() ?? 0.0),
+                (runner.uploadHistory.max() ?? 0.0),
+                1_048_576.0
+            )
+            
+            HStack(spacing: -6) {
+                if runner.isRunning && runner.isWindowVisible {
+                    SpeedCard(
+                        title: "DOWNLOAD",
+                        value: runner.downloadSpeed,
+                        icon: "arrow.down.square.fill",
+                        color: .blue,
+                        history: runner.downloadHistory,
+                        maxVal: maxSpeed,
+                        isVisible: true,
+                        isPaused: isPaused
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                
+                Button {
+                    runner.toggleService(configPath: selectedConfigPath)
+                } label: {
+                    StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
+                }
+                .buttonStyle(.plain)
+                .zIndex(20)
+                
+                if runner.isRunning && runner.isWindowVisible {
+                    SpeedCard(
+                        title: "UPLOAD",
+                        value: runner.uploadSpeed,
+                        icon: "arrow.up.square.fill",
+                        color: .orange,
+                        history: runner.uploadHistory,
+                        maxVal: maxSpeed,
+                        isVisible: true,
+                        isPaused: isPaused
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(width: geoSize.width)
+            .position(x: geoSize.width / 2, y: buttonCenterY)
+        }
+    }
+    
+    // MARK: - 节点列表区域（独立组件，隔离 peers 刷新）
+    struct PeerListArea: View {
+        @StateObject private var runner = EasyTierRunner.shared
+        
+        // 定义两行网格布局，自适应宽度
+        private let gridRows = [
+            GridItem(.fixed(105), spacing: 12),
+            GridItem(.fixed(105), spacing: 12)
+        ]
+        
+        var body: some View {
+            VStack {
+                Spacer()
+                ZStack {
+                    // 1. 加载状态：当服务在运行但还没有 Peers 时显示
+                    if runner.isRunning && runner.peers.isEmpty {
+                        VStack(spacing: 20) {
+                            ProgressView().scaleEffect(1.2).controlSize(.large)
+                            Text("节点加载中")
+                                .font(.title3.bold())
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 222)
+                        .transition(.opacity)
+                    }
+                    
+                    // 2. 节点列表：使用 LazyHGrid 以支持流式上滑动效
+                    if !runner.peers.isEmpty {
+                        NativeHorizontalScroller {
+                            LazyHGrid(rows: gridRows, spacing: 12) {
+                                ForEach(runner.peers) { peer in
+                                    PeerCard(peer: peer)
+                                        .frame(width: 188)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .transition(
+                                            .asymmetric(
+                                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                                removal: .opacity
+                                            )
+                                        )
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .contentShape(Rectangle())
+                        }
+                        .frame(height: 222)
+                        // 容器整体也带一个简单的上滑，确保首次出现时平滑
+                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 222)
+                .padding(.bottom, 16)
+            }
+            .frame(maxWidth: .infinity)
+            // 关键：外层不要加 animation(value: runner.peers)，否则会干扰 ForEach 的 individual transitions
+        }
+    }
+    
+    // MARK: - Sparkline Component (连续滚动折线图 - 类似 Surge)
+    // 使用低帧率 TimelineView + 插值实现平滑滚动效果
     struct Sparkline: View {
         let data: [Double]
         let color: Color
         let maxScale: Double
         let paused: Bool
         
-        var body: some View {
-            GeometryReader { geo in
-                AnimatableSparkline(data: data, color: color, currentMax: maxScale, paused: paused)
-                    .frame(width: geo.size.width + 60, height: geo.size.height + 60)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                    .animation(paused ? nil : .spring(response: 0.5, dampingFraction: 0.7), value: maxScale)
-            }
-        }
-    }
-    
-    struct AnimatableSparkline: View, Animatable {
-        let data: [Double]
-        let color: Color
-        var currentMax: Double
-        let paused: Bool
-        
-        var animatableData: Double {
-            get { currentMax }
-            set { currentMax = newValue }
-        }
-        
-        @State private var ghostValue: Double? = nil
+        @State private var lastData: [Double] = []
         @State private var lastUpdateTime: Date = Date()
         
         var body: some View {
-            Group {
-                if paused {
-                    Color.clear
-                } else {
-                    TimelineView(.periodic(from: .now, by: 1.0 / 24.0)) { timeline in
-                        Canvas { context, size in
-                            let now = timeline.date
-                            // Calculate progress for smooth interpolation (1.0s interval)
-                            let refreshDuration: Double = 1.0
-                            let timeDiff = now.timeIntervalSince(lastUpdateTime)
-                            let progress = min(timeDiff / refreshDuration, 1.0)
-                            
-                            guard data.count > 1 else { return }
-                            
-                            let overflow: CGFloat = 60.0
-                            let shift = overflow / 2.0
-                            
-                            // Shift coordinate system
-                            context.translateBy(x: shift, y: shift)
-                            
-                            let w = size.width - overflow
-                            let h = size.height - overflow
-                            let rightPadding: CGFloat = 10.0
-                            let innerWidth = w - rightPadding
-                            
-                            let range = max(currentMax, 0.001)
-                            let stepX = innerWidth / CGFloat(data.count - 1)
-                            
-                            // Layout constants
-                            let strokeWidth: CGFloat = 3.2
-                            let bottomBuffer: CGFloat = strokeWidth / 2.0 + 0.5
-                            let topBuffer: CGFloat = 8.0
-                            let availableHeight = h - bottomBuffer - topBuffer
-
-                            // 1. Prepare Base Points
-                            var points = data.enumerated().map { (i, val) -> CGPoint in
-                                let x = CGFloat(i) * stepX
-                                let y = h - bottomBuffer - (CGFloat(val / range) * availableHeight)
-                                return CGPoint(x: x, y: y)
-                            }
-                            
-                            // 2. Apply "Growth" to the last point (Y-axis vertical interpolation)
-                            if points.count >= 2 {
-                                let lastIndex = points.count - 1
-                                let secondLastY = points[lastIndex - 1].y
-                                let targetY = points[lastIndex].y
-                                let currentY = secondLastY + (targetY - secondLastY) * CGFloat(progress)
-                                points[lastIndex].y = currentY
-                            }
-                            
-                            // 3. Continuous Scroll Offset (Right to Left horizontal interpolation)
-                            let scrollOffset = (1.0 - progress) * stepX
-                            
-                            context.withCGContext { cgContext in
-                                // 4. Ghost Point (Left edge seamless fill)
-                                let firstY = points.first?.y ?? (h - bottomBuffer)
-                                let ghostValY = ghostValue.map { h - bottomBuffer - (CGFloat($0 / range) * availableHeight) }
-                                let startY = ghostValY ?? firstY
-                                
-                                var path = Path()
-                                path.move(to: CGPoint(x: -stepX, y: startY))
-
-                                // 5. Smoothed History Line (Cubic interpolation for "blunt" peaks)
-                                // Pre-shift the tip to anchor it at the far right
-                                if !points.isEmpty {
-                                    points[points.count - 1].x -= scrollOffset
-                                }
-                                
-                                for i in 0..<points.count {
-                                    let p1 = i == 0 ? CGPoint(x: -stepX, y: startY) : points[i-1]
-                                    let p2 = points[i]
-                                    
-                                    let cp1 = CGPoint(x: p1.x + (p2.x - p1.x)/2, y: p1.y)
-                                    let cp2 = CGPoint(x: p1.x + (p2.x - p1.x)/2, y: p2.y)
-                                    path.addCurve(to: p2, control1: cp1, control2: cp2)
-                                }
-                                
-                                var fillPath = path
-                                fillPath.addLine(to: CGPoint(x: points.last!.x, y: h))
-                                fillPath.addLine(to: CGPoint(x: ghostValue != nil ? -stepX : 0, y: h))
-                                fillPath.closeSubpath()
-                                
-                                // Content Drawing
-                                var contentContext = context
-                                let cardPath = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: 10)
-                                contentContext.clip(to: cardPath)
-                                contentContext.translateBy(x: scrollOffset, y: 0)
-                                
-                                // Gradient Fill
-                                contentContext.fill(fillPath, with: .linearGradient(
-                                    Gradient(colors: [color.opacity(0.3), color.opacity(0)]),
-                                    startPoint: .zero, endPoint: CGPoint(x: 0, y: h)
-                                ))
-                                
-                                // Stroke Line
-                                contentContext.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
-                                
-                                // 7. Hotspot & Pulse (Outside Clip)
-                                context.withCGContext { _ in
-                                     context.translateBy(x: scrollOffset, y: 0)
-                                     
-                                    if let lastPoint = points.last {
-                                        let t = now.timeIntervalSinceReferenceDate
-                                        let pulseDuration: Double = 0.8
-                                        let pulseProg = (t.truncatingRemainder(dividingBy: pulseDuration)) / pulseDuration
-                                        let rippleRadius = 4.0 + (12.0 * pulseProg)
-                                        let rippleOpacity = 0.4 * (1.0 - pulseProg)
-                                        
-                                        // Ripple
-                                        context.stroke(
-                                            Path(ellipseIn: CGRect(x: lastPoint.x - rippleRadius, y: lastPoint.y - rippleRadius, 
-                                                                  width: rippleRadius * 2, height: rippleRadius * 2)),
-                                            with: .color(color.opacity(rippleOpacity)),
-                                            lineWidth: 1.5
-                                        )
-                                        
-                                        // Dot
-                                        let dotSize: CGFloat = 8.0
-                                        let dotRect = CGRect(x: lastPoint.x - dotSize/2, y: lastPoint.y - dotSize/2, width: dotSize, height: dotSize)
-                                        
-                                        context.drawLayer { innerContext in
-                                            innerContext.addFilter(.shadow(color: color.opacity(0.4), radius: 3))
-                                            innerContext.fill(Path(ellipseIn: dotRect), with: .color(color))
-                                            innerContext.stroke(Path(ellipseIn: dotRect), with: .color(.white), lineWidth: 1.5)
-                                        }
-                                    }
-                                }
-                            }
+            if paused {
+                Color.clear
+            } else {
+                // 8 FPS 的 TimelineView，更低 CPU 开销
+                TimelineView(.periodic(from: .now, by: 1.0 / 8.0)) { timeline in
+                    Canvas { context, size in
+                        let now = timeline.date
+                        let timeSinceUpdate = now.timeIntervalSince(lastUpdateTime)
+                        // 1秒内的插值进度 (0.0 ~ 1.0)
+                        let progress = min(timeSinceUpdate, 1.0)
+                        
+                        let w = size.width
+                        let h = size.height
+                        let range = max(maxScale, 0.001)
+                        let rightPad: CGFloat = 8.0
+                        let stepX = data.count > 1 ? (w - rightPad) / CGFloat(data.count - 1) : w
+                        let strokeWidth: CGFloat = 2.5
+                        let bottomPad: CGFloat = strokeWidth / 2 + 1
+                        let topPad: CGFloat = 8.0
+                        let availableH = h - bottomPad - topPad
+                        
+                        guard data.count > 1 else { return }
+                        
+                        // 计算基础点坐标
+                        var points: [CGPoint] = data.enumerated().map { i, val in
+                            let x = CGFloat(i) * stepX
+                            let y = h - bottomPad - (CGFloat(val / range) * availableH)
+                            return CGPoint(x: x, y: max(topPad, min(h - bottomPad, y)))
                         }
-                        .drawingGroup() // Metal Acceleration
+                        
+                        // 最后一个点的 Y 轴插值（从前一个点过渡到当前值）
+                        if points.count >= 2 && lastData.count >= data.count {
+                            let lastIdx = points.count - 1
+                            let prevY = h - bottomPad - (CGFloat(lastData[lastIdx] / range) * availableH)
+                            let targetY = points[lastIdx].y
+                            points[lastIdx].y = prevY + (targetY - prevY) * CGFloat(progress)
+                        }
+                        
+                        // 水平滚动偏移（从右向左滑入）
+                        let scrollOffset = (1.0 - progress) * stepX
+                        
+                        // 应用裁剪区域
+                        let clipRect = CGRect(x: 0, y: 0, width: w - rightPad, height: h)
+                        context.clip(to: Path(roundedRect: clipRect, cornerRadius: 8))
+                        
+                        // 平移整个图表
+                        context.translateBy(x: scrollOffset, y: 0)
+                        
+                        // 幽灵点（左侧延伸）
+                        let ghostX = -stepX
+                        let ghostY = points.first?.y ?? (h - bottomPad)
+                        
+                        // 折线路径
+                        var linePath = Path()
+                        linePath.move(to: CGPoint(x: ghostX, y: ghostY))
+                        for point in points {
+                            linePath.addLine(to: point)
+                        }
+                        
+                        // 填充路径
+                        var fillPath = Path()
+                        fillPath.move(to: CGPoint(x: ghostX, y: h))
+                        fillPath.addLine(to: CGPoint(x: ghostX, y: ghostY))
+                        for point in points {
+                            fillPath.addLine(to: point)
+                        }
+                        if let last = points.last {
+                            fillPath.addLine(to: CGPoint(x: last.x, y: h))
+                        }
+                        fillPath.closeSubpath()
+                        
+                        // 渐变填充
+                        context.fill(fillPath, with: .linearGradient(
+                            Gradient(colors: [color.opacity(0.25), color.opacity(0.02)]),
+                            startPoint: .zero,
+                            endPoint: CGPoint(x: 0, y: h)
+                        ))
+                        
+                        // 折线描边
+                        context.stroke(linePath, with: .color(color), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
+                        
+                        // 端点脉冲动画
+                        if let lastPoint = points.last {
+                            let t = now.timeIntervalSinceReferenceDate
+                            let pulseProg = (t.truncatingRemainder(dividingBy: 0.8)) / 0.8
+                            let pulseRadius = 4.0 + (10.0 * pulseProg)
+                            let pulseOpacity = 0.4 * (1.0 - pulseProg)
+                            
+                            // 脉冲环
+                            context.stroke(
+                                Path(ellipseIn: CGRect(x: lastPoint.x - pulseRadius, y: lastPoint.y - pulseRadius,
+                                                      width: pulseRadius * 2, height: pulseRadius * 2)),
+                                with: .color(color.opacity(pulseOpacity)),
+                                lineWidth: 1.5
+                            )
+                            
+                            // 外发光
+                            let glowRect = CGRect(x: lastPoint.x - 7, y: lastPoint.y - 7, width: 14, height: 14)
+                            context.fill(Path(ellipseIn: glowRect), with: .color(color.opacity(0.2)))
+                            
+                            // 主圆点
+                            let dotRect = CGRect(x: lastPoint.x - 3.5, y: lastPoint.y - 3.5, width: 7, height: 7)
+                            context.fill(Path(ellipseIn: dotRect), with: .color(color))
+                            context.stroke(Path(ellipseIn: dotRect), with: .color(.white), lineWidth: 1.5)
+                        }
                     }
+                    .drawingGroup()
                 }
-            }
-            .onChange(of: data) { newData in
-                if let first = data.first {
-                    ghostValue = first
+                .onChange(of: data) { newData in
+                    lastData = data
+                    lastUpdateTime = Date()
                 }
-                lastUpdateTime = Date()
-            }
-            .onAppear {
-                if let first = data.first { ghostValue = first }
+                .onAppear {
+                    lastData = data
+                    lastUpdateTime = Date()
+                }
             }
         }
     }
@@ -770,55 +788,6 @@ struct StartStopButtonCore: View {
     }
 }
 
-// MARK: - 水波纹（以按钮为中心）
-struct RippleRings: View {
-    let isVisible: Bool  
-    var duration: Double = 4.0
-    var maxScale: CGFloat = 5.0
-    
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ZStack {
-            if isVisible {
-                ForEach(0..<3) { i in
-                    SingleRipple(index: i, duration: duration, maxScale: maxScale)
-                }
-            }
-        }
-        .id(colorScheme) // 确保在亮暗模式切换时，强制重新创建视图以刷新 Environment 透明度
-    }
-}
-
-private struct SingleRipple: View {
-    let index: Int
-    let duration: Double
-    let maxScale: CGFloat
-    
-    @State private var animate = false
-    @Environment(\.colorScheme) private var colorScheme
-    
-    private var baseOpacity: Double {
-        colorScheme == .light ? 0.9 : 0.1
-    }
-    
-    var body: some View {
-        Circle()
-            .fill(Color.white)
-            .frame(width: 84, height: 84) // Match button size
-            .scaleEffect(animate ? maxScale : 1.0)
-            .opacity(animate ? 0 : baseOpacity)
-            .onAppear {
-                // 使用延时来实现环与环之间的节奏感
-                let delay = Double(index) * (duration / 3.0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
-                        animate = true
-                    }
-                }
-            }
-    }
-}
 
 
 
@@ -946,8 +915,12 @@ struct NativeHorizontalScroller<Content: View>: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         if let host = nsView.documentView as? NSHostingView<Content> {
             host.rootView = content
-            host.frame.size = host.fittingSize // 218pt
-            // Height is NOT moved or stretched. It floats freely.
+            
+            // 确保同步更新尺寸以适应内容变化，这能让 SwiftUI 内部的 transition 更稳定
+            let fittingSize = host.fittingSize
+            if host.frame.size != fittingSize {
+                host.frame.size = fittingSize
+            }
         }
     }
 }
