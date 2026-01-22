@@ -235,7 +235,10 @@ final class EasyTierRunner: ObservableObject {
                 
                 if success {
                     self.isRunning = true
-                    self.startedAt = Date()
+                    // 避免启动流程中重复重置 startedAt，导致计时器“走两秒又归零”
+                    if self.startedAt == nil {
+                        self.startedAt = Date()
+                    }
                     self.startUptimeTimer()
                     
                     print("[Runner] Service started successfully. Starting monitoring.")
@@ -441,6 +444,15 @@ final class EasyTierRunner: ObservableObject {
         DispatchQueue.main.async {
             let oldIDs = self.peers.map(\.id)
             let newIDs = sorted.map(\.id)
+
+            // Debug: duplicate IDs will cause LazyHGrid to “跳格/错位”
+            let uniqueCount = Set(newIDs).count
+            if uniqueCount != newIDs.count {
+                var counts: [String: Int] = [:]
+                for id in newIDs { counts[id, default: 0] += 1 }
+                let dups = counts.filter { $0.value > 1 }.map { "\($0.key) x\($0.value)" }.joined(separator: ", ")
+                print("[Runner] WARNING: Duplicate PeerInfo.id detected: \(dups)")
+            }
 
             if oldIDs != newIDs {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {

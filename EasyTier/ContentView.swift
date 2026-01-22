@@ -473,7 +473,10 @@ struct ContentView: View {
                 }
                 
                 Button {
-                    runner.toggleService(configPath: selectedConfigPath)
+                    if !runner.isRunning {
+                            LogParser.shared.resetForNewCoreSession()
+                        }
+                        runner.toggleService(configPath: selectedConfigPath)
                 } label: {
                     StartStopButtonCore(isRunning: runner.isRunning, uptimeText: runner.uptimeText)
                 }
@@ -511,10 +514,34 @@ struct ContentView: View {
         ]
         
         var body: some View {
-            VStack {
+            let peerIDs = runner.peers.map(\.id)
+
+            return VStack {
                 Spacer()
+
                 ZStack {
-                    // 1. 加载状态：当服务在运行但还没有 Peers 时显示
+                    // 1) Grid 永远存在：保证后续插入/删除是“对已有容器的增删”，让 transition 生效
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHGrid(rows: gridRows, spacing: 12) {
+                            ForEach(runner.peers) { peer in
+                                PeerCard(peer: peer)
+                                    .frame(width: 188)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .transition(
+                                        .asymmetric(
+                                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                                            removal: .opacity
+                                        )
+                                    )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                    }
+                    .preventVerticalBounce()
+                    .frame(height: 222)
+
+                    // 2) Loading 仅作为覆盖层，不控制 Grid 的创建/销毁（避免“只有第一张动、后面闪现”）
                     if runner.isRunning && runner.peers.isEmpty {
                         VStack(spacing: 20) {
                             ProgressView().scaleEffect(1.2).controlSize(.large)
@@ -526,37 +553,14 @@ struct ContentView: View {
                         .frame(height: 222)
                         .transition(.opacity)
                     }
-                    
-                    // 2. 节点列表：使用 LazyHGrid 以支持流式上滑动效
-                    if !runner.peers.isEmpty {
-                        NativeHorizontalScroller {
-                            LazyHGrid(rows: gridRows, spacing: 12) {
-                                ForEach(runner.peers) { peer in
-                                    PeerCard(peer: peer)
-                                        .frame(width: 188)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .transition(
-                                            .asymmetric(
-                                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                                removal: .opacity
-                                            )
-                                        )
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .contentShape(Rectangle())
-                        }
-                        .frame(height: 222)
-                        // 容器整体也带一个简单的上滑，确保首次出现时平滑
-                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
-                    }
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 222)
                 .padding(.bottom, 16)
             }
             .frame(maxWidth: .infinity)
-            // 关键：外层不要加 animation(value: runner.peers)，否则会干扰 ForEach 的 individual transitions
+            // 只对「ID 列表」绑定动画：增/减/重排会动画，纯数值刷新不会每秒抖动
+            .animation(.spring(response: 0.5, dampingFraction: 0.82), value: peerIDs)
         }
     }
     

@@ -251,6 +251,9 @@ class SparklineNSView: NSView {
         let threshold: Double = 1_048_576.0
         let maxAbove = max(range - threshold, 1.0)
         
+        @inline(__always)
+        func clamp01(_ x: Double) -> Double { min(max(x, 0.0), 1.0) }
+        
         var allPoints: [CGPoint] = []
         allPoints.reserveCapacity(data.count + 2)
         
@@ -261,11 +264,11 @@ class SparklineNSView: NSView {
             // 这里为了平滑稍微保留一点计算，但已经快了很多
             let prevY = calculateYPosition(value: lastData.first ?? 0, currentRange: range)
             let currRatio = firstRatio
-            let currY = currRatio <= 0.5 ? (minY + CGFloat(currRatio) * availableH) : (midH + CGFloat((currRatio - 0.5) / maxAbove) * (availableH * 0.5))
+            let currY = currRatio <= 0.5 ? (minY + CGFloat(currRatio) * availableH) : (midH + CGFloat(clamp01((currRatio - 0.5) / maxAbove)) * (availableH * 0.5))
             ghostY = prevY + (currY - prevY) * CGFloat(interpolationProgress)
         } else {
             let ratio = normalizedYRatios.first ?? 0
-            ghostY = ratio <= 0.5 ? (minY + CGFloat(ratio) * availableH) : (midH + CGFloat((ratio - 0.5) / maxAbove) * (availableH * 0.5))
+            ghostY = ratio <= 0.5 ? (minY + CGFloat(ratio) * availableH) : (midH + CGFloat(clamp01((ratio - 0.5) / maxAbove)) * (availableH * 0.5))
         }
         allPoints.append(CGPoint(x: ghostX, y: ghostY))
         
@@ -274,7 +277,7 @@ class SparklineNSView: NSView {
             let ratio = normalizedYRatios[i]
             let y: CGFloat = ratio <= 0.5 
                 ? (minY + CGFloat(ratio) * availableH) 
-                : (midH + CGFloat((ratio - 0.5) / maxAbove) * (availableH * 0.5))
+                : (midH + CGFloat(clamp01((ratio - 0.5) / maxAbove)) * (availableH * 0.5))
             allPoints.append(CGPoint(x: CGFloat(i) * stepX, y: y))
         }
         
@@ -282,7 +285,7 @@ class SparklineNSView: NSView {
         let lastPointFixedX = innerWidth
         var lastPointY: CGFloat = 0
         if let lastRatio = normalizedYRatios.last {
-            let targetY = lastRatio <= 0.5 ? (minY + CGFloat(lastRatio) * availableH) : (midH + CGFloat((lastRatio - 0.5) / maxAbove) * (availableH * 0.5))
+            let targetY = lastRatio <= 0.5 ? (minY + CGFloat(lastRatio) * availableH) : (midH + CGFloat(clamp01((lastRatio - 0.5) / maxAbove)) * (availableH * 0.5))
             if hasLastData {
                 let prevY = calculateYPosition(value: lastData.last ?? 0, currentRange: range)
                 lastPointY = prevY + (targetY - prevY) * CGFloat(interpolationProgress)

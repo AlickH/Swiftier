@@ -35,4 +35,16 @@ extension View {
     func lockVerticalScroll() -> some View {
         self.background(ScrollFixer())
     }
+    
+    /// 阻止垂直滚动传播，同时保留transition动画
+    /// 适用于横向ScrollView，防止竖向滑动时的回弹效果
+    func preventVerticalBounce() -> some View {
+        self.background(
+            GeometryReader { _ in
+                Color.clear.background(
+                    ScrollFixer()
+                )
+            }
+        )
+    }
 }

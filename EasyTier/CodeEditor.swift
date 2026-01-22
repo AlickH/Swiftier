@@ -9,6 +9,7 @@ struct CodeEditor: NSViewRepresentable {
     enum Mode {
         case toml
         case log
+        case json
     }
     
     // 高亮逻辑
@@ -78,6 +79,29 @@ struct CodeEditor: NSViewRepresentable {
             
             // Highlight EasyTier keywords
             applyStyle(pattern: "EasyTier", color: NSColor.labelColor, bold: true)
+        } else if mode == .json {
+            // JSON Syntax Highlighting
+            storage.removeAttribute(.foregroundColor, range: fullRange)
+            storage.removeAttribute(.font, range: fullRange)
+            storage.addAttribute(.foregroundColor, value: NSColor.textColor, range: fullRange)
+            
+            let font = NSFont(name: "Menlo", size: 12) ?? NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+            storage.addAttribute(.font, value: font, range: fullRange)
+            
+            // Keys ("key":) - Blue
+            applyStyle(pattern: "\"[^\"]+\"\\s*:", color: NSColor.systemBlue, bold: true)
+            
+            // String values ("value") - Green
+            applyStyle(pattern: ":\\s*\"[^\"]*\"", color: NSColor.systemGreen)
+            
+            // Numbers - Orange
+            applyStyle(pattern: ":\\s*[0-9]+\\.?[0-9]*", color: NSColor.systemOrange)
+            
+            // Boolean and null - Purple
+            applyStyle(pattern: "\\b(true|false|null)\\b", color: NSColor.systemPurple, bold: true)
+            
+            // Brackets and braces - Gray
+            applyStyle(pattern: "[\\[\\]\\{\\}]", color: NSColor.secondaryLabelColor)
         }
     }
 

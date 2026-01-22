@@ -33,9 +33,23 @@ struct PeerInfo: Identifiable, Equatable {
     // 针对“本机”节点的完整信息
     var myNodeData: EasyTierStatus.NodeInfo? = nil
     
-    // 只要业务数据不变，SwiftUI 就不会在运行中刷新卡片视图（防止闪烁）
-    // 移除 tunnel，防止因为 P2P/Relay 切换导致 ID 变化引发重绘闪烁
-    var id: String { "\(sessionID.uuidString)-\(ipv4)-\(hostname)-\(nodeId ?? "")" }
+    // 运行中必须保证稳定且唯一的 id：否则 SwiftUI 会把同一节点当成“删除+新增”，或出现跳格/错位
+    // 优先使用 route.peerId（数值通常最稳定、且唯一），再降级到 instId / nodeId，最后兜底 hostname+ipv4。
+    private var stableKey: String {
+        if let pid = fullData?.route.peerId {
+            return "peerId:\(pid)"
+        }
+        if let inst = (fullData?.route.instId ?? instanceId), !inst.isEmpty {
+            return "inst:\(inst)"
+        }
+        if let nid = nodeId, !nid.isEmpty {
+            return "id:\(nid)"
+        }
+        // 兜底也要尽量唯一
+        return "host:\(hostname)|ip:\(ipv4)|cost:\(cost)"
+    }
+
+    var id: String { stableKey }
 
     static func == (lhs: PeerInfo, rhs: PeerInfo) -> Bool {
         return lhs.ipv4 == rhs.ipv4 &&

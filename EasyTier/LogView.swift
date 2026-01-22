@@ -201,16 +201,8 @@ class LogParser: ObservableObject {
     private func loadEvents() {
         if let data = try? Data(contentsOf: eventsFileURL),
            let saved = try? JSONDecoder().decode([EventEntry].self, from: data) {
-            // Migration: Repair formatting for old events (Fixes array splitting [0,\n 0])
-            self.events = saved.map { event in
-                var newDetails = event.details
-                // Regex: Replace ",\n <spaces><digit>" with ", <digit>" to flatten arrays
-                if let r = try? NSRegularExpression(pattern: ",\\n\\s+(\\d)") {
-                     let range = NSRange(location: 0, length: newDetails.utf16.count)
-                     newDetails = r.stringByReplacingMatches(in: newDetails, options: [], range: range, withTemplate: ", $1")
-                }
-                return EventEntry(id: event.id, timestamp: event.timestamp, date: event.date, type: event.type, details: newDetails)
-            }
+            // Just load events as-is, don't reformat
+            self.events = saved
         }
     }
     
@@ -226,7 +218,7 @@ class LogParser: ObservableObject {
 
     private var timer: Timer?
     private var xpcEventTimer: Timer? // Timer for polling XPC events
-    private var xpcEventIndex: Int = 0 // Track which events we've already fetched
+    private var xpcEventIndex: Int = 0
     private let logPath = "/var/log/swiftier-helper.log"
     private var isReading = false
     private var lastReadOffset: UInt64 = 0
@@ -253,16 +245,14 @@ class LogParser: ObservableObject {
         var newEvents: [EventEntry] = []
         
         for item in eventsAnyArray {
-            // Use hash of the raw item description to track duplicates
-            let itemDesc = "\(item)"
-            let hash = itemDesc.hashValue
-            if seenEventHashes.contains(hash) { continue }
-            seenEventHashes.insert(hash)
+            // Parse first, then deduplicate using stable fields (type + timestamp + details)
+            guard let event = parseEventEntry(from: item) else { continue }
+            let dedupKey = "\(event.type.rawValue)|\(event.timestamp)|\(event.details)"
+            let eventHash = dedupKey.hashValue
+            if seenEventHashes.contains(eventHash) { continue }
+            seenEventHashes.insert(eventHash)
             
-            // Safe parsing
-            if let event = parseEventEntry(from: item) {
-                newEvents.append(event)
-            }
+            newEvents.append(event)
         }
         
         guard !newEvents.isEmpty else { return }
@@ -333,11 +323,38 @@ class LogParser: ObservableObject {
     }
 
 
+    /// Called when Core is started/restarted from UI.
+    /// Clears persisted and in-memory session data so the event/log view reflects the current Core session.
+    func resetForNewCoreSession() {
+        // Stop timers/handles first to avoid appending to arrays while clearing.
+        stopMonitoring()
+        
+        DispatchQueue.main.async {
+            self.logs.removeAll()
+            self.events.removeAll()
+        }
+        
+        pendingLogs.removeAll()
+        seenEventHashes.removeAll()
+        xpcEventIndex = 0
+        lastReadOffset = 0
+        trailingRemainder = ""
+        isReading = false
+        
+        // Clear persisted events so we don't show stale entries from older Core runs.
+        try? FileManager.default.removeItem(at: eventsFileURL)
+    }
+
+
     func startMonitoring() {
         // Restore events from disk to memory
         loadEvents()
         
-        if timer != nil { return } // Already running
+        // If a previous timer/handle is still alive (e.g. the view was reopened quickly), restart cleanly.
+        if timer != nil || fileHandle != nil {
+            stopMonitoring()
+            loadEvents()
+        }
         
         // Start XPC event polling (macOS 13+)
         if #available(macOS 13.0, *) {
@@ -426,8 +443,17 @@ class LogParser: ObservableObject {
                         self.events.removeFirst(self.events.count - self.maxEventItems)
                     }
                     self.saveEvents()
+                    
+                    // Limit seen hashes to prevent memory growth
+                        if self.seenEventHashes.count > 5000 {
+                                self.seenEventHashes.removeAll()
+                // Re-add current events
+                for event in self.events {
+                    self.seenEventHashes.insert(event.details.hashValue)
                 }
             }
+        }
+    }
             
             self.xpcEventIndex = nextIndex
         }
@@ -946,7 +972,60 @@ class LogParser: ObservableObject {
         }
         return nil
     }
-    
+
+    /// Collapses ALL arrays (including nested) into single lines
+    /// Example:
+    /// [
+    ///   206,
+    ///   244
+    /// ]
+    /// -> [206, 244]
+    private func collapsePrettyPrintedArrays(_ input: String) -> String {
+        var res = input
+        
+        // Recursively collapse all arrays from innermost to outermost
+        var maxIterations = 20 // Prevent infinite loops
+        var changed = true
+        
+        while changed && maxIterations > 0 {
+            changed = false
+            maxIterations -= 1
+            
+            // Match any array, including nested ones
+            let pattern = "\\[([^\\[\\]]*?)\\]"
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
+                let range = NSRange(location: 0, length: res.utf16.count)
+                let matches = regex.matches(in: res, options: [], range: range)
+                
+                for match in matches.reversed() {
+                    guard let fullRange = Range(match.range(at: 0), in: res),
+                          let contentRange = Range(match.range(at: 1), in: res) else { continue }
+                    
+                    let content = String(res[contentRange])
+                    
+                    // Collapse whitespace and newlines
+                    let collapsed = content
+                        .components(separatedBy: .newlines)
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                        .joined(separator: " ")
+                        .replacingOccurrences(of: "  ", with: " ")
+                        .trimmingCharacters(in: .whitespaces)
+                    
+                    // Only replace if it actually changed
+                    let original = String(res[fullRange])
+                    let replacement = "[\(collapsed)]"
+                    if original != replacement {
+                        res.replaceSubrange(fullRange, with: replacement)
+                        changed = true
+                    }
+                }
+            }
+        }
+        
+        return res
+    }
+
     private func formatAsJson(_ value: Any?) -> String {
         guard let value = value else { return "null" }
         
@@ -956,7 +1035,10 @@ class LogParser: ObservableObject {
             return "\(value)"
         }
         
-        var options: JSONSerialization.WritingOptions = [.prettyPrinted, .fragmentsAllowed]
+        var options: JSONSerialization.WritingOptions = [.sortedKeys]
+        if #available(macOS 10.13, *) {
+            options.insert(.prettyPrinted)
+        }
         if #available(macOS 10.15, *) {
             options.insert(.withoutEscapingSlashes)
         }
@@ -965,40 +1047,18 @@ class LogParser: ObservableObject {
            let str = String(data: data, encoding: .utf8) {
             var res = str
             
-            // Compact simple arrays (e.g., lists of strings/numbers) to single line
-            // Matches [ content ] where content doesn't contain { or [ (nested structures)
-            let pattern = "\\[\\s*([^\\{\\[\\]]*?)\\s*\\]"
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .dotMatchesLineSeparators) {
-                // Find all matches
-                let range = NSRange(location: 0, length: res.utf16.count)
-                let matches = regex.matches(in: res, options: [], range: range)
-                
-                // Process in reverse to avoid invalidating ranges
-                for match in matches.reversed() {
-                    if let contentRange = Range(match.range(at: 1), in: res) {
-                        let content = String(res[contentRange])
-                        // Collapse whitespace: split by newline and rejoin with space
-                        let collapsed = content
-                            .components(separatedBy: .newlines)
-                            .map { $0.trimmingCharacters(in: .whitespaces) }
-                            .joined(separator: " ")
-                            .trimmingCharacters(in: .whitespaces)
-                        
-                        let fullMatchRange = match.range(at: 0)
-                        if let targetRange = Range(fullMatchRange, in: res) {
-                            res.replaceSubrange(targetRange, with: "[\(collapsed)]")
-                        }
-                    }
-                }
-            }
+            // Collapse simple arrays to a single line for readability
+            res = collapsePrettyPrintedArrays(res)
             
             // Unescape characters for better human readability in the log view
-            return res
+            res = res
                 .replacingOccurrences(of: "\\n", with: "\n")
                 .replacingOccurrences(of: "\\\"", with: "\"")
                 .replacingOccurrences(of: "\\t", with: "\t")
                 // Double check to remove any remaining escaped slashes
                 .replacingOccurrences(of: "\\/", with: "/")
+            
+            return res
         }
         return "\(value)"
     }
@@ -1024,6 +1084,67 @@ struct EventListView: View {
         f.dateFormat = "yyyy年MM月dd日"
         return f
     }()
+    
+    // JSON syntax highlighting  
+    private func highlightJSON(_ json: String) -> AttributedString {
+        var attributed = AttributedString(json)
+        
+        // Keys ("key":) - Blue
+        if let regex = try? NSRegularExpression(pattern: #""[^"]+"\s*:"#) {
+            let nsString = json as NSString
+            let matches = regex.matches(in: json, range: NSRange(location: 0, length: nsString.length))
+            for match in matches.reversed() {
+                if let range = Range(match.range, in: json) {
+                    if let attrRange = Range(range, in: attributed) {
+                        attributed[attrRange].foregroundColor = .blue
+                        attributed[attrRange].font = .system(size: 12, design: .monospaced).bold()
+                    }
+                }
+            }
+        }
+        
+        // String values after colon - Green
+        if let regex = try? NSRegularExpression(pattern: #":\s*"[^"]*""#) {
+            let nsString = json as NSString
+            let matches = regex.matches(in: json, range: NSRange(location: 0, length: nsString.length))
+            for match in matches.reversed() {
+                if let range = Range(match.range, in: json) {
+                    if let attrRange = Range(range, in: attributed) {
+                        attributed[attrRange].foregroundColor = .green
+                    }
+                }
+            }
+        }
+        
+        // Numbers - Orange
+        if let regex = try? NSRegularExpression(pattern: #":\s*[0-9]+\.?[0-9]*"#) {
+            let nsString = json as NSString
+            let matches = regex.matches(in: json, range: NSRange(location: 0, length: nsString.length))
+            for match in matches.reversed() {
+                if let range = Range(match.range, in: json) {
+                    if let attrRange = Range(range, in: attributed) {
+                        attributed[attrRange].foregroundColor = .orange
+                    }
+                }
+            }
+        }
+        
+        // Boolean and null - Purple
+        if let regex = try? NSRegularExpression(pattern: #"\b(true|false|null)\b"#) {
+            let nsString = json as NSString
+            let matches = regex.matches(in: json, range: NSRange(location: 0, length: nsString.length))
+            for match in matches.reversed() {
+                if let range = Range(match.range, in: json) {
+                    if let attrRange = Range(range, in: attributed) {
+                        attributed[attrRange].foregroundColor = .purple
+                        attributed[attrRange].font = .system(size: 12, design: .monospaced).bold()
+                    }
+                }
+            }
+        }
+        
+        return attributed
+    }
     
     var body: some View {
         if events.isEmpty {
@@ -1063,9 +1184,9 @@ struct EventListView: View {
                                             .foregroundColor(.secondary)
                                     }
                                 }
-                                .frame(width: 90, alignment: .trailing)
-                                .padding(.trailing, 10)
-                                .padding(.vertical, 10)
+                                .frame(width: 80, alignment: .trailing)
+                                .padding(.trailing, 8)
+                                .padding(.vertical, 8)
                                 
                                 // 2. Timeline (Continuous line)
                                 ZStack(alignment: .top) {
@@ -1080,8 +1201,8 @@ struct EventListView: View {
                                         .background(Color(NSColor.windowBackgroundColor))
                                         .padding(.top, 14) // Adjusted for new column padding
                                 }
-                                .frame(width: 16)
-                                .padding(.trailing, 12)
+                                .frame(width: 12)
+                                .padding(.trailing, 8)
                                 
                                 // 3. Content
                                 VStack(alignment: .leading, spacing: 8) {
@@ -1089,27 +1210,23 @@ struct EventListView: View {
                                         .font(.system(size: 16, weight: .bold))
                                         .foregroundColor(.primary)
                                     
-                                    // Properly unescape and display the formatted text
-                                    Text(event.details
-                                            .replacingOccurrences(of: "\\\"", with: "\"")
-                                            .replacingOccurrences(of: "\\t", with: "    "))
-                                        .font(.system(size: 12, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                        .textSelection(.enabled)
-                                        .padding(16)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    // Display JSON with character wrapping using NSTextView
+                                    CharWrappingJSONView(json: event.details)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 6)
                                         .background(Color(nsColor: .controlBackgroundColor))
-                                        .cornerRadius(8)
+                                        .cornerRadius(6)
                                 }
                                 .padding(.vertical, 10)
                                 .padding(.bottom, 6)
                             }
                             .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 0))
                             .id(event.id) // Stable ID for the row
                         }
                     }
-                    .listStyle(.inset)
+                    .scrollContentBackground(.hidden)
+                    .listStyle(.plain)
                     .id("event-list-stable")
                     
                     // Floating "Scroll to Top" Button with Liquid Glass effect (macOS 26+)
@@ -1321,6 +1438,155 @@ struct LogDetailView: View {
                 CodeEditor(text: .constant(entry.fullText), mode: .log, isEditable: false)
             }
         }
+    }
+}
+
+// Character-wrapping JSON view using NSTextView  
+struct CharWrappingJSONView: NSViewRepresentable {
+    let json: String
+    
+    func makeNSView(context: Context) -> WrappingTextView {
+        let textView = WrappingTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.textColor = NSColor.labelColor
+        textView.textContainerInset = NSSize(width: 0, height: 2)
+        return textView
+    }
+    
+    func updateNSView(_ nsView: WrappingTextView, context: Context) {
+        // Apply syntax highlighting
+        let attributed = highlightJSONForNSTextView(json)
+        nsView.textStorage?.setAttributedString(attributed)
+    }
+    
+    // 自定义NSTextView，自动调整高度
+    class WrappingTextView: NSTextView {
+        override var intrinsicContentSize: NSSize {
+            guard let layoutManager = layoutManager,
+                  let textContainer = textContainer else {
+                return super.intrinsicContentSize
+            }
+            
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            return NSSize(width: NSView.noIntrinsicMetric, height: usedRect.height + 4)
+        }
+        
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            
+            // 配置文本容器
+            textContainer?.lineBreakMode = .byCharWrapping  // 🔑 按字符硬换行
+            textContainer?.widthTracksTextView = true
+            
+            // 设置文本容器宽度为父视图宽度
+            if let superviewWidth = superview?.bounds.width, superviewWidth > 0 {
+                textContainer?.size = NSSize(width: superviewWidth, height: CGFloat.greatestFiniteMagnitude)
+            }
+        }
+        
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            
+            // 宽度变化时更新文本容器宽度
+            textContainer?.size = NSSize(width: newSize.width, height: CGFloat.greatestFiniteMagnitude)
+            invalidateIntrinsicContentSize()
+        }
+    }
+    
+    private func highlightJSONForNSTextView(_ json: String) -> NSAttributedString {
+        // Collapse arrays first (in case they were expanded during storage/retrieval)
+        let collapsedJSON = collapsePrettyPrintedArrays(json)
+        
+        let attributed = NSMutableAttributedString(string: collapsedJSON)
+        let fullRange = NSRange(location: 0, length: (collapsedJSON as NSString).length)
+        
+        // Set base attributes with character wrapping
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byCharWrapping  // 按字符强制换行
+        attributed.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+        attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), range: fullRange)
+        attributed.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+        
+        // Keys ("key":) - Blue
+        if let regex = try? NSRegularExpression(pattern: #""[^"]+"\s*:"#) {
+            let matches = regex.matches(in: collapsedJSON, range: fullRange)
+            for match in matches {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
+                attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), range: match.range)
+            }
+        }
+        
+        // String values after colon - Green
+        if let regex = try? NSRegularExpression(pattern: #":\s*"[^"]*""#) {
+            let matches = regex.matches(in: collapsedJSON, range: fullRange)
+            for match in matches {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: match.range)
+            }
+        }
+        
+        // Numbers - Orange
+        if let regex = try? NSRegularExpression(pattern: #":\s*[0-9]+\.?[0-9]*"#) {
+            let matches = regex.matches(in: collapsedJSON, range: fullRange)
+            for match in matches {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemOrange, range: match.range)
+            }
+        }
+        
+        // Boolean and null - Purple
+        if let regex = try? NSRegularExpression(pattern: #"\b(true|false|null)\b"#) {
+            let matches = regex.matches(in: collapsedJSON, range: fullRange)
+            for match in matches {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemPurple, range: match.range)
+                attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), range: match.range)
+            }
+        }
+        
+        return attributed
+    }
+    
+    // Collapse arrays to single line
+    private func collapsePrettyPrintedArrays(_ input: String) -> String {
+        var res = input
+        var maxIterations = 20
+        var changed = true
+        
+        while changed && maxIterations > 0 {
+            changed = false
+            maxIterations -= 1
+            
+            let pattern = "\\[([^\\[\\]]*?)\\]"
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
+                let range = NSRange(location: 0, length: res.utf16.count)
+                let matches = regex.matches(in: res, options: [], range: range)
+                
+                for match in matches.reversed() {
+                    guard let fullRange = Range(match.range(at: 0), in: res),
+                          let contentRange = Range(match.range(at: 1), in: res) else { continue }
+                    
+                    let content = String(res[contentRange])
+                    let collapsed = content
+                        .components(separatedBy: .newlines)
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                        .joined(separator: " ")
+                        .replacingOccurrences(of: "  ", with: " ")
+                        .trimmingCharacters(in: .whitespaces)
+                    
+                    let original = String(res[fullRange])
+                    let replacement = "[\(collapsed)]"
+                    if original != replacement {
+                        res.replaceSubrange(fullRange, with: replacement)
+                        changed = true
+                    }
+                }
+            }
+        }
+        
+        return res
     }
 }
 
