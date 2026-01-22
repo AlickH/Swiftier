@@ -1,7 +1,11 @@
 import SwiftUI
 
-struct PeerCard: View {
+struct PeerCard: View, Equatable {
     let peer: PeerInfo
+    
+    static func == (lhs: PeerCard, rhs: PeerCard) -> Bool {
+        lhs.peer == rhs.peer
+    }
     @State private var isHovering = false
     @State private var showDetail = false
     @Environment(\.colorScheme) var colorScheme

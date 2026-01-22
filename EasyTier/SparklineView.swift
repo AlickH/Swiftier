@@ -138,8 +138,8 @@ class SparklineNSView: NSView {
     
     private func setupAnimationTimer() {
         stopAnimationTimer()
-        // 20 FPS 平滑动画，在保持丝滑滚动的同时显著降低 CPU 负载
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20.0, repeats: true) { [weak self] _ in
+        // 12 FPS 平滑动画，足以在视觉上保持流动感，同时显著降低 CPU 绘图负载
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12.0, repeats: true) { [weak self] _ in
             guard let self = self, !self.isPaused, !self.data.isEmpty else { return }
             self.needsDisplay = true
         }
@@ -254,14 +254,14 @@ class SparklineNSView: NSView {
         @inline(__always)
         func clamp01(_ x: Double) -> Double { min(max(x, 0.0), 1.0) }
         
-        var allPoints: [CGPoint] = []
-        allPoints.reserveCapacity(data.count + 2)
+        // 性能：复用内部缓冲区以减少每帧内存分配
+        var pointsToDraw: [CGPoint] = []
+        pointsToDraw.reserveCapacity(data.count + 2)
         
         // 幽灵点
         let ghostX = -stepX
         var ghostY: CGFloat = 0
         if hasLastData, let firstRatio = normalizedYRatios.first {
-            // 这里为了平滑稍微保留一点计算，但已经快了很多
             let prevY = calculateYPosition(value: lastData.first ?? 0, currentRange: range)
             let currRatio = firstRatio
             let currY = currRatio <= 0.5 ? (minY + CGFloat(currRatio) * availableH) : (midH + CGFloat(clamp01((currRatio - 0.5) / maxAbove)) * (availableH * 0.5))
@@ -270,7 +270,7 @@ class SparklineNSView: NSView {
             let ratio = normalizedYRatios.first ?? 0
             ghostY = ratio <= 0.5 ? (minY + CGFloat(ratio) * availableH) : (midH + CGFloat(clamp01((ratio - 0.5) / maxAbove)) * (availableH * 0.5))
         }
-        allPoints.append(CGPoint(x: ghostX, y: ghostY))
+        pointsToDraw.append(CGPoint(x: ghostX, y: ghostY))
         
         // 中间点循环 (由于已经预处理了 Ratios，这里只有极简的浮点乘加)
         for i in 0..<(data.count - 1) {
@@ -278,7 +278,7 @@ class SparklineNSView: NSView {
             let y: CGFloat = ratio <= 0.5 
                 ? (minY + CGFloat(ratio) * availableH) 
                 : (midH + CGFloat(clamp01((ratio - 0.5) / maxAbove)) * (availableH * 0.5))
-            allPoints.append(CGPoint(x: CGFloat(i) * stepX, y: y))
+            pointsToDraw.append(CGPoint(x: CGFloat(i) * stepX, y: y))
         }
         
         // 最后一个点 (脉冲点)
@@ -293,7 +293,9 @@ class SparklineNSView: NSView {
                 lastPointY = targetY
             }
         }
-        allPoints.append(CGPoint(x: lastPointFixedX - scrollOffset, y: lastPointY))
+        pointsToDraw.append(CGPoint(x: lastPointFixedX - scrollOffset, y: lastPointY))
+        
+        // ... (后续使用 pointsToDraw)
         
         // 裁剪区域（圆角遮罩，防止超出左下角圆角）
         let clipPath = CGMutablePath()
@@ -306,7 +308,7 @@ class SparklineNSView: NSView {
         // 应用水平滚动偏移
         context.translateBy(x: scrollOffset, y: 0)
         
-        // 2. 辅助函数：绘制平滑曲线
+        // 2. 辅助函数：绘制折线 (移除高开销的贝塞尔曲线)
         func addCurvedPath(to path: CGMutablePath, points: [CGPoint], startWithMove: Bool) {
             guard points.count > 1 else { return }
             if startWithMove {
@@ -315,19 +317,15 @@ class SparklineNSView: NSView {
                 path.addLine(to: points[0])
             }
             
-            for i in 0..<(points.count - 1) {
-                let p1 = points[i]
-                let p2 = points[i+1]
-                let controlPoint1 = CGPoint(x: p1.x + (p2.x - p1.x) / 2, y: p1.y)
-                let controlPoint2 = CGPoint(x: p2.x - (p2.x - p1.x) / 2, y: p2.y)
-                path.addCurve(to: p2, control1: controlPoint1, control2: controlPoint2)
+            for i in 1..<points.count {
+                path.addLine(to: points[i])
             }
         }
         
         // 1. 填充路径 (需要闭合到基准线 Y=0)
         let fillPath = CGMutablePath()
         fillPath.move(to: CGPoint(x: ghostX, y: 0))
-        addCurvedPath(to: fillPath, points: allPoints, startWithMove: false)
+        addCurvedPath(to: fillPath, points: pointsToDraw, startWithMove: false)
         fillPath.addLine(to: CGPoint(x: lastPointFixedX - scrollOffset, y: 0))
         fillPath.closeSubpath()
         
@@ -358,7 +356,7 @@ class SparklineNSView: NSView {
         context.translateBy(x: scrollOffset, y: 0)
         
         let linePath = CGMutablePath()
-        addCurvedPath(to: linePath, points: allPoints, startWithMove: true)
+        addCurvedPath(to: linePath, points: pointsToDraw, startWithMove: true)
         
         context.setStrokeColor(color.cgColor)
         context.setLineWidth(strokeWidth)

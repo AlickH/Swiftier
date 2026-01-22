@@ -3,7 +3,12 @@ import Combine
 
 struct ContentView: View {
     
-    @StateObject private var runner = EasyTierRunner.shared
+    // 性能优化：不再直接观察整个 runner，避免 uptime/speed 变化触发全量 Diff
+    // 改为手动监听核心状态
+    private var runner = EasyTierRunner.shared
+    @State private var isRunning = false
+    @State private var isWindowVisible = true
+    @State private var sessionID = UUID()
     @StateObject private var configManager = ConfigManager.shared
 
     @StateObject private var permissionManager = PermissionManager.shared
@@ -30,7 +35,7 @@ struct ContentView: View {
             // 不再手动设置背景，利用 MenuBarExtra 原生窗口的 Vibrancy
             
             // 主内容层
-            if runner.isWindowVisible {
+            if isWindowVisible {
                 VStack(spacing: 0) {
                     headerView
                     //Divider()
@@ -81,7 +86,7 @@ struct ContentView: View {
             
             // 生成器全屏覆盖层
             // 优化：只有显示时才创建，避免频繁初始化
-            if showConfigGenerator && runner.isWindowVisible {
+            if showConfigGenerator && isWindowVisible {
                 ConfigGeneratorView(
                     isPresented: $showConfigGenerator,
                     editingFileURL: selectedConfig,
@@ -170,6 +175,9 @@ struct ContentView: View {
         .onDisappear {
             runner.isWindowVisible = false
         }
+        .onReceive(runner.$isRunning) { self.isRunning = $0 }
+        .onReceive(runner.$isWindowVisible) { self.isWindowVisible = $0 }
+        .onReceive(runner.$sessionID) { self.sessionID = $0 }
         .lockVerticalScroll() // 🔒 Global Lock: Prevents the entire window container from bouncing
     }
     
@@ -326,7 +334,7 @@ struct ContentView: View {
         GeometryReader { geo in
             ZStack {
                 // 1) 水波纹层 (放在最底层) - UIKit 高性能实现
-                if runner.isRunning && runner.isWindowVisible {
+                if isRunning && isWindowVisible {
                     RippleRingsView(isVisible: true, duration: 4.0, maxScale: 5.5)
                         .frame(width: 500, height: 500)
                         .position(x: geo.size.width / 2, y: buttonCenterY(in: geo.size.height))
@@ -336,16 +344,16 @@ struct ContentView: View {
                 }
 
                 // 2) 节点列表区域 - 使用独立组件隔离刷新
-                if runner.isRunning && runner.isWindowVisible && !isAnyOverlayShown {
+                if isRunning && isWindowVisible && !isAnyOverlayShown {
                     PeerListArea()
-                        .id(runner.sessionID)
+                        .id(sessionID)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .zIndex(1)
                 }
 
                 // 3) 启动按钮与网速仪表盘层 - 使用独立组件隔离刷新
-                if runner.isWindowVisible {
+                if isWindowVisible {
                     SpeedDashboard(
                         selectedConfigPath: selectedConfig?.path ?? configManager.configFiles.first?.path ?? "",
                         geoSize: geo.size,
@@ -355,7 +363,7 @@ struct ContentView: View {
                     .zIndex(10)
                 }
             }
-            .animation(.spring(response: 1.0, dampingFraction: 0.8), value: runner.isRunning)
+            .animation(.spring(response: 1.0, dampingFraction: 0.8), value: isRunning)
             .animation(.spring(response: 0.55, dampingFraction: 0.8), value: showLogView)
             .blur(radius: isAnyOverlayShown ? 10 : 0)
             .opacity(isAnyOverlayShown ? 0.3 : 1.0)
@@ -363,11 +371,11 @@ struct ContentView: View {
     }
     
     private func buttonCenterY(in contentHeight: CGFloat) -> CGFloat {
-        runner.isRunning ? 133 : (contentHeight / 2) // Centered between duration (Y=20) and peer cards (Y=234)
+        isRunning ? 133 : (contentHeight / 2) // Centered between duration (Y=20) and peer cards (Y=234)
     }
     
     // MARK: - SpeedCard Component
-    struct SpeedCard: View {
+    struct SpeedCard: View, Equatable {
         let title: String
         let value: String // e.g. "133.3 KB/s"
         let icon: String
@@ -375,7 +383,16 @@ struct ContentView: View {
         let history: [Double]
         let maxVal: Double
         let isVisible: Bool
-        let isPaused: Bool // 新增：是否暂停
+        let isPaused: Bool
+        
+        // 性能关键：手动实现 Equatable 避开不必要的重绘
+        static func == (lhs: SpeedCard, rhs: SpeedCard) -> Bool {
+            lhs.value == rhs.value &&
+            lhs.history == rhs.history &&
+            lhs.maxVal == rhs.maxVal &&
+            lhs.isVisible == rhs.isVisible &&
+            lhs.isPaused == rhs.isPaused
+        }
         
         // Helper to split value and unit
         private var splitValue: (number: String, unit: String) {
@@ -451,11 +468,7 @@ struct ContentView: View {
         @ObservedObject private var runner = EasyTierRunner.shared
         
         var body: some View {
-            let maxSpeed = max(
-                (runner.downloadHistory.max() ?? 0.0),
-                (runner.uploadHistory.max() ?? 0.0),
-                1_048_576.0
-            )
+            let maxSpeed = runner.maxHistorySpeed // 直接使用缓存，不再遍历数组
             
             HStack(spacing: -6) {
                 if runner.isRunning && runner.isWindowVisible {
@@ -469,6 +482,7 @@ struct ContentView: View {
                         isVisible: true,
                         isPaused: isPaused
                     )
+                    .equatable()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
@@ -494,6 +508,7 @@ struct ContentView: View {
                         isVisible: true,
                         isPaused: isPaused
                     )
+                    .equatable()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -525,6 +540,7 @@ struct ContentView: View {
                         LazyHGrid(rows: gridRows, spacing: 12) {
                             ForEach(runner.peers) { peer in
                                 PeerCard(peer: peer)
+                                    .equatable()
                                     .frame(width: 188)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .transition(

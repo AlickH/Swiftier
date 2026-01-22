@@ -11,6 +11,7 @@ final class EasyTierRunner: ObservableObject {
     @Published var peerCount: String = "0"
     @Published var downloadSpeed: String = "0 KB/s"
     @Published var uploadSpeed: String = "0 KB/s"
+    @Published var maxHistorySpeed: Double = 1_048_576.0 // 缓存最大网速计算结果
     // 优化：窗口可见性变化时自动管理 Timer
     @Published var isWindowVisible = true {
         didSet {
@@ -42,6 +43,7 @@ final class EasyTierRunner: ObservableObject {
     private var lastTotalRx: Int = 0
     private var lastTotalTx: Int = 0
     private var lastPollTime: Date?
+    private var lastProcessingTime: Date = .distantPast // 用于频率限制
     
     // Peer-level speed tracking
     private var lastPeerStats: [Int: (rx: Int, tx: Int, time: Date)] = [:]
@@ -320,13 +322,19 @@ final class EasyTierRunner: ObservableObject {
     }
 
     private func processRunningInfo(_ jsonStr: String) {
-        // 静默模式：窗口隐藏时跳过所有处理，只保留时间戳以便恢复时计算
-        guard isWindowVisible else {
-            lastPollTime = Date()
+        let now = Date()
+        // 性能优化：限制解析频率最高为每 0.8 秒一次，避免高频 Push 导致 CPU 飙升
+        guard now.timeIntervalSince(lastProcessingTime) >= 0.8 else {
             return
         }
         
-        let now = Date()
+        // 静默模式：窗口隐藏时跳过所有处理，只保留时间戳以便恢复时计算
+        guard isWindowVisible else {
+            lastPollTime = now
+            return
+        }
+        
+        lastProcessingTime = now
         guard let data = jsonStr.data(using: .utf8) else { return }
         
         var totalRx = 0
@@ -416,10 +424,17 @@ final class EasyTierRunner: ObservableObject {
                 let rSpeed = max(0, Double(totalRx - lastTotalRx) / d)
                 let tSpeed = max(0, Double(totalTx - lastTotalTx) / d)
                 DispatchQueue.main.async {
-                        self.downloadSpeed = self.formatSpeed(rSpeed)
-                        self.uploadSpeed = self.formatSpeed(tSpeed)
+                    self.downloadSpeed = self.formatSpeed(rSpeed)
+                    self.uploadSpeed = self.formatSpeed(tSpeed)
                     self.downloadHistory.removeFirst(); self.downloadHistory.append(rSpeed)
                     self.uploadHistory.removeFirst(); self.uploadHistory.append(tSpeed)
+                    
+                    // 性能优化：在此处预计算最大值，避免 View body 每秒计算多次
+                    self.maxHistorySpeed = max(
+                        (self.downloadHistory.max() ?? 0.0),
+                        (self.uploadHistory.max() ?? 0.0),
+                        1_048_576.0
+                    )
                 }
             }
         }

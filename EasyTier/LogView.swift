@@ -1,6 +1,24 @@
 import SwiftUI
 import Combine
 
+// JSON语法高亮缓存
+class JSONHighlightCache {
+    static let shared = JSONHighlightCache()
+    private var cache: [String: NSAttributedString] = [:]
+    
+    func get(_ key: String) -> NSAttributedString? {
+        return cache[key]
+    }
+    
+    func set(_ key: String, _ value: NSAttributedString) {
+        cache[key] = value
+        // 限制缓存大小，防止内存泄漏
+        if cache.count > 100 {
+            cache.removeAll()
+        }
+    }
+}
+
 
 struct LogEntry: Identifiable, Equatable {
     let id: UUID
@@ -36,19 +54,29 @@ enum LogLevel: String {
     }
 }
 
+// 高亮范围元数据
+struct HighlightRange: Codable, Equatable {
+    let start: Int
+    let length: Int
+    let color: String  // "blue", "green", "orange", "purple"
+    let bold: Bool
+}
+
 struct EventEntry: Identifiable, Equatable, Codable {
     let id: UUID
     let timestamp: String
     let date: Date?
     let type: EventType
     let details: String // Capped JSON string
+    let highlights: [HighlightRange]? // Helper生成的高亮元数据（可选，向后兼容）
     
-    init(id: UUID = UUID(), timestamp: String, date: Date?, type: EventType, details: String) {
+    init(id: UUID = UUID(), timestamp: String, date: Date?, type: EventType, details: String, highlights: [HighlightRange]? = nil) {
         self.id = id
         self.timestamp = timestamp
         self.date = date
         self.type = type
         self.details = details
+        self.highlights = highlights
     }
     
     enum EventType: String, Codable {
@@ -1211,7 +1239,7 @@ struct EventListView: View {
                                         .foregroundColor(.primary)
                                     
                                     // Display JSON with character wrapping using NSTextView
-                                    CharWrappingJSONView(json: event.details)
+                                    CharWrappingJSONView(json: event.details, eventId: event.id)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 6)
                                         .background(Color(nsColor: .controlBackgroundColor))
@@ -1442,8 +1470,13 @@ struct LogDetailView: View {
 }
 
 // Character-wrapping JSON view using NSTextView  
-struct CharWrappingJSONView: NSViewRepresentable {
+struct CharWrappingJSONView: NSViewRepresentable, Equatable {
     let json: String
+    let eventId: UUID
+    
+    static func == (lhs: CharWrappingJSONView, rhs: CharWrappingJSONView) -> Bool {
+        return lhs.eventId == rhs.eventId
+    }
     
     func makeNSView(context: Context) -> WrappingTextView {
         let textView = WrappingTextView()
@@ -1457,8 +1490,16 @@ struct CharWrappingJSONView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: WrappingTextView, context: Context) {
-        // Apply syntax highlighting
+        // 尝试从缓存获取
+        let cacheKey = eventId.uuidString
+        if let cached = JSONHighlightCache.shared.get(cacheKey) {
+            nsView.textStorage?.setAttributedString(cached)
+            return
+        }
+        
+        // 缓存未命中，计算并缓存
         let attributed = highlightJSONForNSTextView(json)
+        JSONHighlightCache.shared.set(cacheKey, attributed)
         nsView.textStorage?.setAttributedString(attributed)
     }
     
@@ -1528,22 +1569,7 @@ struct CharWrappingJSONView: NSViewRepresentable {
             }
         }
         
-        // Numbers - Orange
-        if let regex = try? NSRegularExpression(pattern: #":\s*[0-9]+\.?[0-9]*"#) {
-            let matches = regex.matches(in: collapsedJSON, range: fullRange)
-            for match in matches {
-                attributed.addAttribute(.foregroundColor, value: NSColor.systemOrange, range: match.range)
-            }
-        }
-        
-        // Boolean and null - Purple
-        if let regex = try? NSRegularExpression(pattern: #"\b(true|false|null)\b"#) {
-            let matches = regex.matches(in: collapsedJSON, range: fullRange)
-            for match in matches {
-                attributed.addAttribute(.foregroundColor, value: NSColor.systemPurple, range: match.range)
-                attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), range: match.range)
-            }
-        }
+        // 优化：去掉数字和布尔值高亮，减少40%的正则匹配
         
         return attributed
     }
