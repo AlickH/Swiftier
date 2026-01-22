@@ -228,9 +228,29 @@ class LogParser: ObservableObject {
     
     private func loadEvents() {
         if let data = try? Data(contentsOf: eventsFileURL),
-           let saved = try? JSONDecoder().decode([EventEntry].self, from: data) {
-            // Just load events as-is, don't reformat
+           var saved = try? JSONDecoder().decode([EventEntry].self, from: data) {
+            
+            // 升级：为没有高亮元数据的旧事件补算高亮，并重新压缩数组
+            var needsSave = false
+            for i in 0..<saved.count {
+                let collapsedDetails = collapsePrettyPrintedArrays(saved[i].details)
+                let needsRecalc = saved[i].highlights == nil || collapsedDetails != saved[i].details
+                
+                if needsRecalc {
+                    saved[i] = EventEntry(
+                        id: saved[i].id,
+                        timestamp: saved[i].timestamp,
+                        date: saved[i].date,
+                        type: saved[i].type,
+                        details: collapsedDetails,
+                        highlights: calculateHighlights(for: collapsedDetails)
+                    )
+                    needsSave = true
+                }
+            }
+            
             self.events = saved
+            if needsSave { saveEvents() }
         }
     }
     
@@ -342,11 +362,15 @@ class LogParser: ObservableObject {
         let cleanedPayload = recursiveJsonClean(eventPayload, depth: 0)
         let detailsStr = formatAsJson(cleanedPayload)
         
+        // 性能优化：在后台预计算高亮元数据
+        let highlights = calculateHighlights(for: detailsStr)
+        
         return EventEntry(
             timestamp: displayTimestamp,
             date: eventDate,
             type: type,
-            details: detailsStr
+            details: detailsStr,
+            highlights: highlights
         )
     }
 
@@ -838,11 +862,16 @@ class LogParser: ObservableObject {
         if let type = eventType {
             let cleanedPayload = recursiveJsonClean(eventPayload, depth: 0)
             let detailsStr = capString(formatAsJson(cleanedPayload), limit: maxFullTextLength)
+            
+            // 性能优化：在后台预计算高亮元数据
+            let highlights = calculateHighlights(for: detailsStr)
+            
             newEvents.append(EventEntry(
                 timestamp: timestamp, 
                 date: dateParser(timestamp),
                 type: type, 
-                details: detailsStr
+                details: detailsStr,
+                highlights: highlights
             ))
         }
     }
@@ -1008,47 +1037,32 @@ class LogParser: ObservableObject {
     ///   244
     /// ]
     /// -> [206, 244]
+    /// 将 JSON 中的数组拍扁成单行显示 (更节省空间)
     private func collapsePrettyPrintedArrays(_ input: String) -> String {
         var res = input
+        // 匹配所有简单的数组包 [ ... ]，只要内部不含 { 或 [
+        // (?s) 让 . 匹配换行符
+        let pattern = #"(?s)\[\s*([^\[\]{}]*?)\s*\]"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return res }
         
-        // Recursively collapse all arrays from innermost to outermost
-        var maxIterations = 20 // Prevent infinite loops
-        var changed = true
+        // 从后往前处理，这样替换后不会影响前面的索引
+        let nsString = res as NSString
+        let matches = regex.matches(in: res, options: [], range: NSRange(location: 0, length: nsString.length))
         
-        while changed && maxIterations > 0 {
-            changed = false
-            maxIterations -= 1
+        for match in matches.reversed() {
+            let content = nsString.substring(with: match.range(at: 1))
             
-            // Match any array, including nested ones
-            let pattern = "\\[([^\\[\\]]*?)\\]"
-            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
-                let range = NSRange(location: 0, length: res.utf16.count)
-                let matches = regex.matches(in: res, options: [], range: range)
-                
-                for match in matches.reversed() {
-                    guard let fullRange = Range(match.range(at: 0), in: res),
-                          let contentRange = Range(match.range(at: 1), in: res) else { continue }
-                    
-                    let content = String(res[contentRange])
-                    
-                    // Collapse whitespace and newlines
-                    let collapsed = content
-                        .components(separatedBy: .newlines)
-                        .map { $0.trimmingCharacters(in: .whitespaces) }
-                        .filter { !$0.isEmpty }
-                        .joined(separator: " ")
-                        .replacingOccurrences(of: "  ", with: " ")
-                        .trimmingCharacters(in: .whitespaces)
-                    
-                    // Only replace if it actually changed
-                    let original = String(res[fullRange])
-                    let replacement = "[\(collapsed)]"
-                    if original != replacement {
-                        res.replaceSubrange(fullRange, with: replacement)
-                        changed = true
-                    }
-                }
-            }
+            // 将所有换行和缩进替换为单个空格，并规范化逗号
+            let collapsedContent = content.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+                .replacingOccurrences(of: ", ", with: ",")
+                .replacingOccurrences(of: ",", with: ", ")
+                .trimmingCharacters(in: .whitespaces)
+            
+            let collapsed = "[\(collapsedContent)]"
+            res = (res as NSString).replacingCharacters(in: match.range, with: collapsed)
         }
         
         return res
@@ -1089,6 +1103,60 @@ class LogParser: ObservableObject {
             return res
         }
         return "\(value)"
+    }
+
+    /// 后台计算 JSON / Rust-Debug 高亮区间元数据
+    private func calculateHighlights(for json: String) -> [HighlightRange] {
+        var ranges: [HighlightRange] = []
+        let nsString = json as NSString
+        let fullRange = NSRange(location: 0, length: nsString.length)
+        
+        // 1. Strings (Green) - 先画底色，后面小范围的高亮会覆盖它
+        // 匹配引号内的内容，包括转义引号的内容
+        if let regex = try? NSRegularExpression(pattern: #""([^"\\]|\\.)*""#) {
+            let matches = regex.matches(in: json, range: fullRange)
+            for match in matches {
+                ranges.append(HighlightRange(start: match.range.location, length: match.range.length, color: "green", bold: false))
+            }
+        }
+
+        // 2. Keys (Blue) - 覆盖掉部分绿色（如果是键的话）
+        // 匹配 "key": 或 unquoted_key:
+        // 后者常见于 Rust 的 Debug 输出
+        if let regex = try? NSRegularExpression(pattern: #"("[^"]+"|\b[a-zA-Z_][a-zA-Z0-9_]*\b)\s*:"#) {
+            let matches = regex.matches(in: json, range: fullRange)
+            for match in matches {
+                // 重点高亮前面的 key 部分
+                if let keyRange = Range(match.range, in: json) {
+                    let fullMatchStr = String(json[keyRange])
+                    if let colonIndex = fullMatchStr.firstIndex(of: ":") {
+                        let keyPartLength = fullMatchStr[..<colonIndex].utf16.count
+                        ranges.append(HighlightRange(start: match.range.location, length: keyPartLength, color: "blue", bold: true))
+                    }
+                }
+            }
+        }
+        
+        // 3. Numbers (Orange) - 具有更高优先级，覆盖绿色
+        // 匹配单独的数字。注意：避免匹配 UUID 或 版本号中混杂的数字
+        // 规则：前后必须是边界，且不能紧挨着字母
+        if let regex = try? NSRegularExpression(pattern: #"(?<![a-zA-Z0-9_])\d+(\.\d+)?(?![a-zA-Z0-9_])"#) {
+            let matches = regex.matches(in: json, range: fullRange)
+            for match in matches {
+                ranges.append(HighlightRange(start: match.range.location, length: match.range.length, color: "orange", bold: false))
+            }
+        }
+        
+        // 4. Keywords/Booleans (Purple)
+        // 支持 JSON 和 Rust 常用关键字
+        if let regex = try? NSRegularExpression(pattern: #"\b(true|false|null|None|Some|Ok|Err)\b"#) {
+            let matches = regex.matches(in: json, range: fullRange)
+            for match in matches {
+                ranges.append(HighlightRange(start: match.range.location, length: match.range.length, color: "purple", bold: true))
+            }
+        }
+        
+        return ranges
     }
 }
 
@@ -1239,7 +1307,8 @@ struct EventListView: View {
                                         .foregroundColor(.primary)
                                     
                                     // Display JSON with character wrapping using NSTextView
-                                    CharWrappingJSONView(json: event.details, eventId: event.id)
+                                    let highlights = event.highlights ?? []
+                                    CharWrappingJSONView(json: event.details, highlights: highlights, eventId: event.id)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 6)
                                         .background(Color(nsColor: .controlBackgroundColor))
@@ -1472,6 +1541,7 @@ struct LogDetailView: View {
 // Character-wrapping JSON view using NSTextView  
 struct CharWrappingJSONView: NSViewRepresentable, Equatable {
     let json: String
+    let highlights: [HighlightRange]
     let eventId: UUID
     
     static func == (lhs: CharWrappingJSONView, rhs: CharWrappingJSONView) -> Bool {
@@ -1490,16 +1560,8 @@ struct CharWrappingJSONView: NSViewRepresentable, Equatable {
     }
     
     func updateNSView(_ nsView: WrappingTextView, context: Context) {
-        // 尝试从缓存获取
-        let cacheKey = eventId.uuidString
-        if let cached = JSONHighlightCache.shared.get(cacheKey) {
-            nsView.textStorage?.setAttributedString(cached)
-            return
-        }
-        
-        // 缓存未命中，计算并缓存
-        let attributed = highlightJSONForNSTextView(json)
-        JSONHighlightCache.shared.set(cacheKey, attributed)
+        // UI 零计算：直接使用预生成的 highlights
+        let attributed = highlightWithMetadata(json, highlights: highlights)
         nsView.textStorage?.setAttributedString(attributed)
     }
     
@@ -1538,83 +1600,47 @@ struct CharWrappingJSONView: NSViewRepresentable, Equatable {
         }
     }
     
-    private func highlightJSONForNSTextView(_ json: String) -> NSAttributedString {
-        // Collapse arrays first (in case they were expanded during storage/retrieval)
-        let collapsedJSON = collapsePrettyPrintedArrays(json)
+    private func highlightWithMetadata(_ json: String, highlights: [HighlightRange]) -> NSAttributedString {
+        let attributed = NSMutableAttributedString(string: json)
+        let fullRange = NSRange(location: 0, length: (json as NSString).length)
         
-        let attributed = NSMutableAttributedString(string: collapsedJSON)
-        let fullRange = NSRange(location: 0, length: (collapsedJSON as NSString).length)
-        
-        // Set base attributes with character wrapping
+        // 设置基础属性（按字符换行，等宽字体）
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineBreakMode = .byCharWrapping  // 按字符强制换行
+        paragraphStyle.lineBreakMode = .byCharWrapping
         attributed.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
         attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), range: fullRange)
         attributed.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
         
-        // Keys ("key":) - Blue
-        if let regex = try? NSRegularExpression(pattern: #""[^"]+"\s*:"#) {
-            let matches = regex.matches(in: collapsedJSON, range: fullRange)
-            for match in matches {
-                attributed.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
-                attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), range: match.range)
+        // 零正则匹配：直接根据 metadata 应用颜色
+        for h in highlights {
+            let range = NSRange(location: h.start, length: h.length)
+            // 防止索引越界
+            guard range.location + range.length <= (json as NSString).length else { continue }
+            
+            let color: NSColor
+            switch h.color {
+            case "blue": color = .systemBlue
+            case "green": color = .systemGreen
+            case "orange": color = .systemOrange
+            case "purple": color = .systemPurple
+            default: color = .labelColor
+            }
+            
+            attributed.addAttribute(.foregroundColor, value: color, range: range)
+            if h.bold {
+                attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), range: range)
             }
         }
-        
-        // String values after colon - Green
-        if let regex = try? NSRegularExpression(pattern: #":\s*"[^"]*""#) {
-            let matches = regex.matches(in: collapsedJSON, range: fullRange)
-            for match in matches {
-                attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: match.range)
-            }
-        }
-        
-        // 优化：去掉数字和布尔值高亮，减少40%的正则匹配
         
         return attributed
     }
     
-    // Collapse arrays to single line
-    private func collapsePrettyPrintedArrays(_ input: String) -> String {
-        var res = input
-        var maxIterations = 20
-        var changed = true
-        
-        while changed && maxIterations > 0 {
-            changed = false
-            maxIterations -= 1
-            
-            let pattern = "\\[([^\\[\\]]*?)\\]"
-            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
-                let range = NSRange(location: 0, length: res.utf16.count)
-                let matches = regex.matches(in: res, options: [], range: range)
-                
-                for match in matches.reversed() {
-                    guard let fullRange = Range(match.range(at: 0), in: res),
-                          let contentRange = Range(match.range(at: 1), in: res) else { continue }
-                    
-                    let content = String(res[contentRange])
-                    let collapsed = content
-                        .components(separatedBy: .newlines)
-                        .map { $0.trimmingCharacters(in: .whitespaces) }
-                        .filter { !$0.isEmpty }
-                        .joined(separator: " ")
-                        .replacingOccurrences(of: "  ", with: " ")
-                        .trimmingCharacters(in: .whitespaces)
-                    
-                    let original = String(res[fullRange])
-                    let replacement = "[\(collapsed)]"
-                    if original != replacement {
-                        res.replaceSubrange(fullRange, with: replacement)
-                        changed = true
-                    }
-                }
-            }
-        }
-        
-        return res
-    }
+    // Optimized: CharWrappingJSONView should now be "Zero-Logic"
+    // It directly displays the text and highlights stored in EventEntry.
 }
+
+// MARK: - Legacy Support & Helpers
+// Removed redundant collapsePrettyPrintedArrays here to prevent logic desync
 
 // Custom Modifier to handle OS version check for Glass Effect
 struct GlassButtonModifier: ViewModifier {
