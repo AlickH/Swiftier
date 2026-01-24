@@ -64,6 +64,17 @@
     "ERROR" : {
 
     },
+    "f" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P2P"
+          }
+        }
+      }
+    },
     "GitHub 仓库" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -116,17 +127,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Open Here"
-          }
-        }
-      }
-    },
-    "P2P" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "P2P"
           }
         }
       }
@@ -978,6 +978,17 @@
         }
       }
     },
+    "安装并自启" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install & Relaunch"
+          }
+        }
+      }
+    },
     "完全磁盘访问权限" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1199,6 +1210,9 @@
       }
     },
     "手动分配路由 CIDR，将禁用子网代理和从对等节点传播的 wireguard 路由。例如：192.168.0.0/16" : {
+
+    },
+    "手动分配路由 CIDR，将禁用子网代理和从对等节点传播的 wireguard路由。例如：192.168.0.0/16" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1209,7 +1223,7 @@
         }
       }
     },
-    "手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点. 例如：tcp://123.123.123.123:11223，可以指定多个。" : {
+    "手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点。例如：tcp://123.123.123.123:11223，可以指定多个。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1219,9 +1233,6 @@
           }
         }
       }
-    },
-    "手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点。例如：tcp://123.123.123.123:11223，可以指定多个。" : {
-
     },
     "接收" : {
       "extractionState" : "manual",
@@ -1373,6 +1384,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MIT Licensed."
+          }
+        }
+      }
+    },
+    "查看文件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show File"
           }
         }
       }
@@ -1802,6 +1824,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Later"
+          }
+        }
+      }
+    },
+    "立即下载" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Now"
           }
         }
       }

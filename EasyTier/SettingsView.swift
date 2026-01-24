@@ -20,7 +20,7 @@ struct SettingsView: View {
     @State private var isCheckingAppUpdate = false
     @State private var appUpdateStatus: String?
     @State private var showAppUpdateDetail = false
-    @State private var appVersionInfo: (version: String, body: String, downloadURL: String)?
+    @State private var appVersionInfo: (version: String, body: String, downloadURL: String, assets: [[String: Any]])?
     @AppStorage("appAutoUpdate") private var appAutoUpdate: Bool = true
     @AppStorage("appBetaChannel") private var appBetaChannel: Bool = false
     
@@ -198,13 +198,13 @@ struct SettingsView: View {
                     .zIndex(100)
             }
             
-            // APP Update Detail Popup
             if showAppUpdateDetail, let info = appVersionInfo {
                 AppUpdateDetailView(
                     isPresented: $showAppUpdateDetail,
                     version: info.version,
                     releaseNotes: info.body,
-                    downloadURL: info.downloadURL
+                    downloadURL: info.downloadURL,
+                    assets: info.assets
                 )
                 .transition(.move(edge: .bottom))
                 .zIndex(101)
@@ -284,10 +284,25 @@ struct SettingsView: View {
                 let remoteVersion = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
                 let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
                 
-                // 比较版本号
                 if remoteVersion.compare(currentVersion, options: .numeric) == .orderedDescending {
+                    
+                    // Parse assets to find the best download URL
+
+                    // For now we just pass the raw assets list, filtering logic will be in the Detail View
+                    // However, we are parsing the RELEASE object above, so we need to get assets from it
+                    
+                    var releaseAssets: [[String: Any]] = []
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let assets = json["assets"] as? [[String: Any]] {
+                        releaseAssets = assets
+                    } else if let releases = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                              let first = releases.first,
+                              let assets = first["assets"] as? [[String: Any]] {
+                        releaseAssets = assets
+                    }
+
                     await MainActor.run {
-                        appVersionInfo = (remoteVersion, releaseBody, downloadURL)
+                        appVersionInfo = (remoteVersion, releaseBody, downloadURL, releaseAssets)
                         showAppUpdateDetail = true
                         appUpdateStatus = "有新版本可用"
                     }
@@ -329,27 +344,240 @@ struct AppUpdateDetailView: View {
     let version: String
     let releaseNotes: String
     let downloadURL: String
+    let assets: [[String: Any]]
+    
+    @State private var isDownloading = false
+    @State private var downloadProgress: Double = 0
+    @State private var downloadTask: URLSessionDownloadTask?
+    @State private var showRevealButton = false
+    @State private var downloadedFileURL: URL?
     
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            UnifiedHeader(title: "Swiftier \(version) 可用") {
-                Button("稍后") { withAnimation { isPresented = false } }
-                    .buttonStyle(.bordered)
-            } right: {
-                Button("前往下载") {
-                    if let url = URL(string: downloadURL) {
-                        NSWorkspace.shared.open(url)
+            UnifiedHeader(title: LocalizedStringKey("Swiftier \(version) 可用")) {
+                Button(LocalizedStringKey("稍后")) { 
+                    if isDownloading {
+                        downloadTask?.cancel()
+                        isDownloading = false
                     }
-                    withAnimation { isPresented = false }
+                    withAnimation { isPresented = false } 
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
+            } right: {
+                if showRevealButton {
+                    HStack {
+                        Button(LocalizedStringKey("查看文件")) {
+                            if let url = downloadedFileURL {
+                                NSWorkspace.shared.activateFileViewerSelecting([url])
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Button(LocalizedStringKey("安装并自启")) {
+                            smartInstall()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } else if isDownloading {
+                    ProgressView(value: downloadProgress)
+                        .progressViewStyle(.linear)
+                        .frame(width: 100)
+                } else {
+                    Button(LocalizedStringKey("立即下载")) {
+                        startDownload()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
             
             // Release Notes
             MarkdownWebView(markdown: releaseNotes)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+    
+    private func startDownload() {
+        // Find best asset (dmg > zip, arm64 vs x64 logic if needed, but usually universal or specific)
+        // For simplicity, find first .dmg, then .zip
+        // In a real scenario, check architecture
+        
+        guard let assetURL = findBestAssetURL() else {
+            // Fallback to opening browser
+            if let url = URL(string: downloadURL) {
+                NSWorkspace.shared.open(url)
+            }
+            return
+        }
+        
+        isDownloading = true
+        downloadProgress = 0
+        
+        let url = URL(string: assetURL)!
+        let session = URLSession(configuration: .default, delegate: DownloadDelegate(progress: { p in
+            DispatchQueue.main.async { self.downloadProgress = p }
+        }, completion: { location, error in
+            // Must be careful to capture values before jumping to async
+            guard let location = location else { return }
+            let fileManager = FileManager.default
+            let downloadsURL = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+            let destinationURL = downloadsURL.appendingPathComponent(url.lastPathComponent)
+            
+            do {
+                try? fileManager.removeItem(at: destinationURL) // Overwrite
+                try fileManager.moveItem(at: location, to: destinationURL)
+                
+                // Force UI update on Main Thread
+                Task { @MainActor in
+                    self.downloadedFileURL = destinationURL
+                    self.showRevealButton = true
+                    self.isDownloading = false
+                    
+                    // Reveal file
+                    NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
+                }
+            } catch {
+                print("File move error: \(error)")
+                Task { @MainActor in
+                    self.isDownloading = false
+                }
+            }
+        }), delegateQueue: nil)
+        
+        let task = session.downloadTask(with: url)
+        task.resume()
+        self.downloadTask = task
+    }
+    
+    private func smartInstall() {
+        guard let assetURL = downloadedFileURL else { return }
+        let currentAppURL = Bundle.main.bundleURL
+        
+        // Safety: Only proceed if we are a .app bundle
+        guard currentAppURL.pathExtension == "app" else {
+            NSWorkspace.shared.open(assetURL)
+            return
+        }
+        
+        let fileManager = FileManager.default
+        let tempScriptURL = fileManager.temporaryDirectory.appendingPathComponent("swiftier_update.sh")
+        
+        // Script Logic:
+        // 1. Wait for PID to close (passed as arg)
+        // 2. Extract/Mount
+        // 3. Replace
+        // 4. Relaunch
+        // 5. Self-destruct script
+        
+        let script = """
+        #!/bin/bash
+        PID=$1
+        DMG_PATH="$2"
+        DEST_APP="$3"
+        TEMP_MOUNT="/tmp/Swiftier_Update_Mount"
+        
+        # 1. Wait for parent to exit
+        while kill -0 $PID 2>/dev/null; do sleep 0.5; done
+        
+        echo "Starting update..."
+        
+        # 2. Extract payload
+        SOURCE_APP=""
+        
+        if [[ "$DMG_PATH" == *.dmg ]]; then
+            hdiutil attach -nobrowse "$DMG_PATH" -mountpoint "$TEMP_MOUNT"
+            SOURCE_APP=$(find "$TEMP_MOUNT" -maxdepth 1 -name "*.app" -print -quit)
+        elif [[ "$DMG_PATH" == *.zip ]]; then
+            unzip -o "$DMG_PATH" -d "$TEMP_MOUNT"
+            SOURCE_APP=$(find "$TEMP_MOUNT" -maxdepth 2 -name "*.app" -print -quit)
+        fi
+        
+        if [ -z "$SOURCE_APP" ]; then
+            echo "Failed to find app in update"
+            open "$DMG_PATH"
+            exit 1
+        fi
+        
+        # 3. Replace
+        rm -rf "$DEST_APP"
+        cp -R "$SOURCE_APP" "$DEST_APP"
+        
+        # 4. Cleanup
+        if [[ "$DMG_PATH" == *.dmg ]]; then
+            hdiutil detach "$TEMP_MOUNT"
+        else
+            rm -rf "$TEMP_MOUNT"
+        fi
+        
+        # 5. Relaunch
+        open "$DEST_APP"
+        
+        # Cleanup Script
+        rm -- "$0"
+        """
+        
+        do {
+            try script.write(to: tempScriptURL, atomically: true, encoding: .utf8)
+            try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempScriptURL.path)
+            
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = [tempScriptURL.path, String(ProcessInfo.processInfo.processIdentifier), assetURL.path, currentAppURL.path]
+            
+            try process.run()
+            
+            NSApplication.shared.terminate(nil)
+        } catch {
+            print("Install failed: \(error)")
+            NSWorkspace.shared.open(assetURL)
+        }
+    }
+    
+    private func findBestAssetURL() -> String? {
+        // Simple logic: prefer .dmg, then .zip
+        // Filter for "Swiftier" in name to avoid other assets
+        let validAssets = assets.filter { asset in
+            guard let name = asset["name"] as? String else { return false }
+            return name.contains("Swiftier") || name.contains("EasyTier")
+        }
+        
+        // Priority 1: .dmg
+        if let dmg = validAssets.first(where: { ($0["name"] as? String)?.hasSuffix(".dmg") ?? false }) {
+            return dmg["browser_download_url"] as? String
+        }
+        
+        // Priority 2: .zip
+        if let zip = validAssets.first(where: { ($0["name"] as? String)?.hasSuffix(".zip") ?? false }) {
+            return zip["browser_download_url"] as? String
+        }
+        
+        return nil
+    }
+}
+
+// Delegate for progress
+class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+    let progress: (Double) -> Void
+    let completion: (URL?, Error?) -> Void
+    
+    init(progress: @escaping (Double) -> Void, completion: @escaping (URL?, Error?) -> Void) {
+        self.progress = progress
+        self.completion = completion
+    }
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        completion(location, nil)
+    }
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        progress(p)
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            completion(nil, error)
+        }
     }
 }
 
