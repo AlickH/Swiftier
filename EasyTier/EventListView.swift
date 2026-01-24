@@ -5,15 +5,16 @@ struct EventListView: View {
     
     private let timeFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
+        f.dateStyle = .none
+        f.timeStyle = .medium // 自动处理 24h/12h 格式
         return f
     }()
     
-    private let dateFormatter: DateFormatter = {
+    private func formatDateOnly(_ date: Date) -> String {
         let f = DateFormatter()
-        f.dateFormat = "yyyy年MM月dd日"
-        return f
-    }()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
     
     var body: some View {
         if events.isEmpty {
@@ -36,7 +37,7 @@ struct EventListView: View {
                                     if let date = event.date {
                                         Text(timeFormatter.string(from: date))
                                             .font(.system(size: 16, weight: .black, design: .rounded))
-                                        Text(dateFormatter.string(from: date))
+                                        Text(formatDateOnly(date))
                                             .font(.system(size: 10))
                                             .foregroundColor(.secondary)
                                     } else {

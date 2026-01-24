@@ -30,10 +30,10 @@ struct SettingsView: View {
         ZStack {
             VStack(spacing: 0) {
             // Header
-            UnifiedHeader(title: "设置") {
-                Button("完成") {}.buttonStyle(.bordered).hidden() // Placeholder
+            UnifiedHeader(title: LocalizedStringKey("设置")) {
+                Button(LocalizedStringKey("完成")) {}.buttonStyle(.bordered).hidden() // Placeholder
             } right: {
-                Button("完成") {
+                Button(LocalizedStringKey("完成")) {
                     withAnimation { isPresented = false }
                 }
                 .buttonStyle(.borderedProminent)
@@ -41,7 +41,7 @@ struct SettingsView: View {
             
             // Native Form
             Form {
-                Section("通用") {
+                Section(header: Text("通用")) {
                     // macOS 风格的更新状态卡片
                     HStack(spacing: 12) {
                         // 状态图标
@@ -56,7 +56,7 @@ struct SettingsView: View {
                         
                         // 状态文字
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(appUpdateStatus ?? "Swiftier 已是最新版本")
+                            Text(LocalizedStringKey(appUpdateStatus ?? "Swiftier 已是最新版本"))
                                 .font(.headline)
                             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
                             Text("Swiftier \(version)")
@@ -67,7 +67,7 @@ struct SettingsView: View {
                         Spacer()
                         
                         // 检查更新按钮
-                        Button("检查更新") {
+                        Button(LocalizedStringKey("检查更新")) {
                             checkAppUpdate()
                         }
                         .disabled(isCheckingAppUpdate)
@@ -92,12 +92,12 @@ struct SettingsView: View {
                         }
                     
                     HStack {
-                        Text("退出 APP 时")
+                        Text(LocalizedStringKey("退出 APP 时"))
                         Spacer()
                         Picker("", selection: $exitBehavior) {
-                            Text("保持连接运行").tag("keepRunning")
-                            Text("仅保留 Helper 加速启动").tag("stopCore")
-                            Text("完全退出").tag("stopAll")
+                            Text(LocalizedStringKey("保持连接运行")).tag("keepRunning")
+                            Text(LocalizedStringKey("仅保留 Helper 加速启动")).tag("stopCore")
+                            Text(LocalizedStringKey("完全退出")).tag("stopAll")
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
@@ -105,7 +105,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                Section("隐私") {
+                Section(header: Text("隐私")) {
                     HStack {
                         Text("完全磁盘访问权限")
                         Spacer()
@@ -128,14 +128,14 @@ struct SettingsView: View {
 
                 
                 Section(header: Text("日志"), footer: Text("修改日志等级后，需要停止并重新启动服务才能生效。")) {
-                    Picker("日志等级", selection: $logLevel) {
+                    Picker(LocalizedStringKey("日志等级"), selection: $logLevel) {
                         ForEach(logLevels, id: \.self) { level in
                             Text(level).tag(level)
                         }
                     }
                 }
                 
-                Section("关于") {
+                Section(header: Text("关于")) {
                     HStack {
                         Text("开发者")
                         Spacer()
@@ -481,7 +481,7 @@ SOFTWARE.
     var body: some View {
         VStack(spacing: 0) {
             UnifiedHeader(title: "MIT License") {
-                Button("关闭") { 
+                Button(LocalizedStringKey("关闭")) { 
                     withAnimation { isPresented = false }
                 }
                 .buttonStyle(.bordered)

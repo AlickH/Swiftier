@@ -11,7 +11,7 @@ struct ConfigEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            UnifiedHeader(title: fileURL.lastPathComponent) {
+            UnifiedHeader(title: LocalizedStringKey(fileURL.lastPathComponent)) {
                 Button("取消", role: .destructive) {
                     withAnimation { isPresented = false }
                 }

@@ -46,14 +46,15 @@ struct PeerCard: View, Equatable {
         let text = clean(raw)
         let lower = text.lowercased()
         
-        if lower == "local" { return "本机" }
-        if lower == "p2p" { return "直连" }
-        if lower.contains("p2p") { return text.replacingOccurrences(of: "p2p", with: "直连", options: .caseInsensitive) }
+        if lower == "local" { return "Local" }
+        if lower == "p2p" { return "P2P" }
+        // Remove forced replacement for p2p to allow "P2P" or "P2P(x)" to show naturally
         
-        if lower == "relay" { return "中转" }
-        if lower.contains("relay") {
-            return text.replacingOccurrences(of: "relay", with: "中转", options: .caseInsensitive)
-        }
+        if lower == "relay" { return "Relay" }
+        // Remove forced replacement for relay
+        
+        // Capitalize first letter for other cases if needed, or return as is
+        if lower.starts(with: "relay") { return text.replacingOccurrences(of: "relay", with: "Relay", options: .caseInsensitive) }
         
         return text
     }
@@ -62,33 +63,34 @@ struct PeerCard: View, Equatable {
         let text = clean(raw)
         let lower = text.lowercased()
         
-        if lower == "unknown" { return "未知" }
-        if lower == "nopat" { return "一对一" }
+        if lower == "unknown" { return "Unknown" }
+        if lower == "nopat" { return "No PAT" }
         
-        if lower.hasPrefix("openinternet") { return "开放" }
-        if lower.hasPrefix("fullcone") { return "全锥形" }
-        if lower.hasPrefix("symmetric") { return "对称" }
+        if lower.hasPrefix("openinternet") { return "Open" }
+        if lower.hasPrefix("fullcone") { return "Full Cone" }
+        if lower.hasPrefix("symmetric") { return "Symmetric" }
         
-        // Checking PortRestricted before Restricted to avoid partial match overlap
-        if lower.contains("portrestricted") { return "端口受限" }
-        if lower.contains("restricted") { return "受限" }
+        if lower.contains("portrestricted") { return "Port Restricted" }
+        if lower.contains("restricted") { return "Restricted" }
         
         return text
     }
     
     private func natColor(for text: String) -> Color {
-        if text.contains("全锥形") || text.contains("开放") || text.contains("一对一") { return .blue }
-        if text.contains("对称") { return .red }
-        if text.contains("端口受限") { return .orange }
-        if text.contains("受限") { return .yellow }
+        let t = text.lowercased()
+        if t.contains("全锥形") || t.contains("full cone") || t.contains("开放") || t.contains("open") || t.contains("一对一") || t.contains("no pat") { return .blue }
+        if t.contains("对称") || t.contains("symmetric") { return .red }
+        if t.contains("端口受限") || t.contains("port restricted") { return .orange }
+        if t.contains("受限") || t.contains("restricted") { return .yellow }
         return .gray
     }
     
     private func tagColor(for text: String) -> Color {
+        let t = text.lowercased()
         // Tunnel Colors
-        if text.contains("直连") { return .blue }
-        if text.contains("中转") { return .purple }
-        if text.contains("本机") { return .gray }
+        if t.contains("直连") || t.contains("p2p") { return .blue }
+        if t.contains("中转") || t.contains("relay") { return .purple }
+        if t.contains("本机") || t.contains("local") { return .gray }
         return .gray
     }
 
@@ -98,6 +100,7 @@ struct PeerCard: View, Equatable {
             HStack(alignment: .center, spacing: 0) {
                 ScrollingText(text: peer.hostname.isEmpty ? "未知节点" : peer.hostname)
                     .frame(height: 18)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Spacer(minLength: 8)
                 
@@ -159,24 +162,25 @@ struct PeerCard: View, Equatable {
                 let rawTunnel = translateTunnel(peer.tunnel.isEmpty ? "-" : peer.tunnel)
                 let tTunnel = (rawTunnel.uppercased().contains("TCP") || rawTunnel.uppercased().contains("UDP")) ? rawTunnel : "-"
                 let tNat = translateNAT(peer.nat)
-                let tCost = translateTunnel(peer.cost) // Cost column also contains p2p/local info
+                let tCost = translateTunnel(peer.cost)
                 
-                // Adjusted Ratios: Cost 22%, Tunnel 18%, NAT 40%, Version 20%
                 HStack(spacing: spacing) {
-                    Tag(text: tCost, color: tagColor(for: tCost))
+                    Tag(text: LocalizedStringKey(tCost), color: tagColor(for: tCost))
                         .frame(width: totalWidth * 0.22)
                     
-                    Tag(text: tTunnel, color: tagColor(for: tTunnel))
+                    Tag(text: LocalizedStringKey(tTunnel), color: tagColor(for: tTunnel))
                         .frame(width: totalWidth * 0.18)
                     
-                    Tag(text: tNat, color: natColor(for: tNat))
+                    Tag(text: LocalizedStringKey(tNat), color: natColor(for: tNat))
                         .frame(width: totalWidth * 0.40)
                     
-                    Tag(text: shortVersion, color: .gray)
+                    Tag(text: LocalizedStringKey(shortVersion), color: .gray)
                         .frame(width: totalWidth * 0.20)
                 }
+                .fixedSize(horizontal: true, vertical: true)
             }
             .frame(height: 22)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 10)
@@ -260,7 +264,7 @@ struct ScrollingText: View {
 }
 
 struct Tag: View {
-    let text: String
+    let text: LocalizedStringKey
     var color: Color = .gray
     
     var body: some View {
@@ -285,7 +289,7 @@ struct PeerDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            Text("点击条目以复制内容")
+            Text(LocalizedStringKey("点击条目以复制内容"))
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.vertical, 8)
@@ -306,18 +310,18 @@ struct PeerDetailView: View {
     
     @ViewBuilder
     private func localNodeSections(_ node: EasyTierStatus.NodeInfo) -> some View {
-        Section("节点") {
-            DetailRow(label: "主机名", value: node.hostname)
-            DetailRow(label: "版本", value: node.version)
-            DetailRow(label: "虚拟 IP", value: node.virtualIPv4?.description ?? "-")
-            DetailRow(label: "UDP NAT 类型", value: node.stunInfo?.udpNATType.description ?? "-")
-            DetailRow(label: "TCP NAT 类型", value: node.stunInfo?.tcpNATType.description ?? "-")
+        Section(header: Text(LocalizedStringKey("节点"))) {
+            DetailRow(label: LocalizedStringKey("主机名"), value: node.hostname)
+            DetailRow(label: LocalizedStringKey("版本"), value: node.version)
+            DetailRow(label: LocalizedStringKey("虚拟 IP"), value: node.virtualIPv4?.description ?? "-")
+            DetailRow(label: LocalizedStringKey("UDP NAT 类型"), value: node.stunInfo?.udpNATType.description ?? "-")
+            DetailRow(label: LocalizedStringKey("TCP NAT 类型"), value: node.stunInfo?.tcpNATType.description ?? "-")
         }
         
         if let listeners = node.listeners, !listeners.isEmpty {
-            Section("监听地址") {
+            Section(header: Text(LocalizedStringKey("监听地址"))) {
                 ForEach(listeners.indices, id: \.self) { i in
-                    DetailRow(label: "监听 \(i+1)", value: listeners[i].url)
+                    DetailRow(label: LocalizedStringKey("监听 \(i+1)"), value: listeners[i].url)
                 }
             }
         }
@@ -327,43 +331,43 @@ struct PeerDetailView: View {
     private func remotePeerSections(_ pair: EasyTierStatus.PeerRoutePair) -> some View {
         let route = pair.route
         
-        Section("节点") {
-            DetailRow(label: "主机名", value: route.hostname)
-            DetailRow(label: "节点 ID", value: "\(route.peerId)", isMonospaced: true)
-            DetailRow(label: "实例 ID", value: route.instId, isMonospaced: true)
-            DetailRow(label: "版本", value: route.version)
-            DetailRow(label: "下一跳 ID", value: "\(route.nextHopPeerId)", isMonospaced: true)
-            DetailRow(label: "代价", value: "\(route.cost)")
-            DetailRow(label: "路径延迟", value: "\(route.pathLatency/1000) ms")
+        Section(header: Text(LocalizedStringKey("节点"))) {
+            DetailRow(label: LocalizedStringKey("主机名"), value: route.hostname)
+            DetailRow(label: LocalizedStringKey("节点 ID"), value: "\(route.peerId)", isMonospaced: true)
+            DetailRow(label: LocalizedStringKey("实例 ID"), value: route.instId, isMonospaced: true)
+            DetailRow(label: LocalizedStringKey("版本"), value: route.version)
+            DetailRow(label: LocalizedStringKey("下一跳 ID"), value: "\(route.nextHopPeerId)", isMonospaced: true)
+            DetailRow(label: LocalizedStringKey("代价"), value: "\(route.cost)")
+            DetailRow(label: LocalizedStringKey("路径延迟"), value: "\(route.pathLatency/1000) ms")
             
             if let nhLatFirst = route.nextHopPeerIdLatencyFirst {
-                DetailRow(label: "下一跳 (延迟优先)", value: "\(nhLatFirst)", isMonospaced: true)
-                DetailRow(label: "代价 (延迟优先)", value: "\(route.costLatencyFirst ?? 0)")
-                DetailRow(label: "路径延迟 (延迟优先)", value: "\((route.pathLatencyLatencyFirst ?? 0)/1000) ms")
+                DetailRow(label: LocalizedStringKey("下一跳 (延迟优先)"), value: "\(nhLatFirst)", isMonospaced: true)
+                DetailRow(label: LocalizedStringKey("代价 (延迟优先)"), value: "\(route.costLatencyFirst ?? 0)")
+                DetailRow(label: LocalizedStringKey("路径延迟 (延迟优先)"), value: "\((route.pathLatencyLatencyFirst ?? 0)/1000) ms")
             }
             
             if let flags = route.featureFlag {
-                DetailRow(label: "特性标志", value: formatFlags(flags))
+                DetailRow(label: LocalizedStringKey("特性标志"), value: formatFlags(flags))
             }
         }
         
         if let pInfo = pair.peer {
-            Section("连接状态") {
-                DetailRow(label: "默认连接", value: pInfo.defaultConnId?.description ?? "-")
+            Section(header: Text(LocalizedStringKey("连接状态"))) {
+                DetailRow(label: LocalizedStringKey("默认连接"), value: pInfo.defaultConnId?.description ?? "-")
             }
             
             ForEach(pInfo.conns.indices, id: \.self) { i in
                 let conn = pInfo.conns[i]
-                Section("连接 \(i + 1) [\(conn.tunnel?.tunnelType ?? "Unknown")]") {
-                    DetailRow(label: "角色", value: conn.isClient ? "Client" : "Server")
-                    DetailRow(label: "丢包率", value: String(format: "%.2f%%", conn.lossRate * 100))
-                    DetailRow(label: "本地地址", value: conn.tunnel?.localAddr.url ?? "-")
-                    DetailRow(label: "远程地址", value: conn.tunnel?.remoteAddr.url ?? "-")
+                Section(header: Text(LocalizedStringKey("连接 \(i + 1) [\(conn.tunnel?.tunnelType ?? "Unknown")]"))) {
+                    DetailRow(label: LocalizedStringKey("角色"), value: conn.isClient ? "Client" : "Server")
+                    DetailRow(label: LocalizedStringKey("丢包率"), value: String(format: "%.2f%%", conn.lossRate * 100))
+                    DetailRow(label: LocalizedStringKey("本地地址"), value: conn.tunnel?.localAddr.url ?? "-")
+                    DetailRow(label: LocalizedStringKey("远程地址"), value: conn.tunnel?.remoteAddr.url ?? "-")
                     
                     if let s = conn.stats {
-                        DetailRow(label: "接收", value: formatBytes(s.rxBytes))
-                        DetailRow(label: "发送", value: formatBytes(s.txBytes))
-                        DetailRow(label: "延迟", value: String(format: "%.1f ms", Double(s.latencyUs)/1000.0))
+                        DetailRow(label: LocalizedStringKey("接收"), value: formatBytes(s.rxBytes))
+                        DetailRow(label: LocalizedStringKey("发送"), value: formatBytes(s.txBytes))
+                        DetailRow(label: LocalizedStringKey("延迟"), value: String(format: "%.1f ms", Double(s.latencyUs)/1000.0))
                     }
                 }
             }
@@ -372,16 +376,16 @@ struct PeerDetailView: View {
     
     @ViewBuilder
     private var basicSections: some View {
-        Section("基础信息") {
-            DetailRow(label: "主机名", value: peer.hostname)
-            DetailRow(label: "虚拟 IP", value: peer.ipv4)
-            DetailRow(label: "版本", value: peer.version)
+        Section(header: Text(LocalizedStringKey("基础信息"))) {
+            DetailRow(label: LocalizedStringKey("主机名"), value: peer.hostname)
+            DetailRow(label: LocalizedStringKey("虚拟 IP"), value: peer.ipv4)
+            DetailRow(label: LocalizedStringKey("版本"), value: peer.version)
         }
-        Section("网络信息") {
-            DetailRow(label: "代价", value: peer.cost)
-            DetailRow(label: "延迟", value: peer.latency + " ms")
-            DetailRow(label: "丢包率", value: peer.loss)
-            DetailRow(label: "隧道方式", value: peer.tunnel)
+        Section(header: Text(LocalizedStringKey("网络信息"))) {
+            DetailRow(label: LocalizedStringKey("代价"), value: peer.cost)
+            DetailRow(label: LocalizedStringKey("延迟"), value: peer.latency + " ms")
+            DetailRow(label: LocalizedStringKey("丢包率"), value: peer.loss)
+            DetailRow(label: LocalizedStringKey("隧道方式"), value: peer.tunnel)
         }
     }
     
@@ -406,7 +410,7 @@ struct PeerDetailView: View {
 }
 
 struct DetailRow: View {
-    let label: String
+    let label: LocalizedStringKey
     let value: String
     var isMonospaced: Bool = false
     
@@ -423,7 +427,7 @@ struct DetailRow: View {
             
             Spacer(minLength: 8)
             
-            Text(value.isEmpty ? "-" : value)
+            Text(LocalizedStringKey(value.isEmpty ? "-" : value))
                 .font(isMonospaced ? .system(size: 13, weight: .regular, design: .monospaced) : .system(size: 13))
                 .foregroundColor(.secondary)
                 .lineLimit(1)

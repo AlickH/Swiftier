@@ -136,6 +136,10 @@ enum PeerMode: String, CaseIterable, Identifiable {
     case manual = "手动"
     case standalone = "独立"
     var id: String { rawValue }
+    
+    var localizedTitle: LocalizedStringKey {
+        LocalizedStringKey(rawValue)
+    }
 }
 // MARK: - Draft Manager
 class ConfigDraftManager {
@@ -282,14 +286,14 @@ struct ConfigGeneratorView: View {
     // MARK: - Advanced View
     var advancedView: some View {
         VStack(spacing: 0) {
-            header(title: "高级设置", leftBtn: "返回") { pop() }
+            header(title: LocalizedStringKey("高级设置"), leftBtn: LocalizedStringKey("返回"), leftRole: .cancel) { pop() }
             
             Form {
                 // 1. 通用 (General)
-                SwiftUI.Section("通用") {
+                SwiftUI.Section(header: Text(LocalizedStringKey("通用"))) {
                     HStack {
-                        Text("主机名称")
-                        TextField("默认", text: $model.instanceName)
+                        Text(LocalizedStringKey("主机名称"))
+                        TextField(LocalizedStringKey("默认"), text: $model.instanceName)
                             .multilineTextAlignment(.trailing)
                             .textFieldStyle(.plain)
                             .labelsHidden()
@@ -376,10 +380,10 @@ struct ConfigGeneratorView: View {
                 }
                 
                 // 3. 代理网段 (Proxy CIDR)
-                SwiftUI.Section("代理网段") {
+                SwiftUI.Section(header: Text(LocalizedStringKey("代理网段"))) {
                     ForEach($model.proxySubnets) { $subnet in
                         HStack {
-                            Text("代理：")
+                            Text(LocalizedStringKey("代理："))
                                 .foregroundColor(.secondary)
                             Spacer()
                             IPv4CidrField(ip: Binding(
@@ -525,11 +529,11 @@ struct ConfigGeneratorView: View {
                 }
                 
                 // 8. SOCKS5 服务器 (SOCKS5 Server)
-                SwiftUI.Section(header: Text("SOCKS5 服务器"), footer: Text("开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 EasyTier 网络。")) {
-                    Toggle("启用", isOn: $model.enableSocks5)
+                SwiftUI.Section(header: Text(LocalizedStringKey("SOCKS5 服务器")), footer: Text(LocalizedStringKey("开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 EasyTier 网络。"))) {
+                    Toggle(LocalizedStringKey("启用"), isOn: $model.enableSocks5)
                     if model.enableSocks5 {
                         HStack {
-                            Text("监听端口")
+                            Text(LocalizedStringKey("监听端口"))
                             Spacer()
                             TextField("", value: $model.socks5Port, format: .number.grouping(.never))
                                 .multilineTextAlignment(.trailing)
@@ -540,10 +544,10 @@ struct ConfigGeneratorView: View {
                 }
                 
                 // 9. 出口节点列表 (Exit Nodes)
-                SwiftUI.Section(header: Text("出口节点列表"), footer: Text("转发所有流量的出口节点，虚拟 IPv4 地址，优先级由列表顺序决定。")) {
+                SwiftUI.Section(header: Text(LocalizedStringKey("出口节点列表")), footer: Text(LocalizedStringKey("转发所有流量的出口节点，虚拟 IPv4 地址，优先级由列表顺序决定。"))) {
                     ForEach($model.exitNodes.indices, id: \.self) { i in
                         HStack {
-                            Text("节点：")
+                            Text(LocalizedStringKey("节点："))
                                 .foregroundColor(.secondary)
                             Spacer()
                             IPv4Field(ip: Binding(
@@ -564,19 +568,19 @@ struct ConfigGeneratorView: View {
                     Button { model.exitNodes.append("") } label: {
                         HStack {
                             Image(systemName: "plus.circle.fill")
-                            Text("添加出口节点")
+                            Text(LocalizedStringKey("添加出口节点"))
                         }
                         .foregroundColor(.blue)
                     }.buttonStyle(.plain)
                 }
                 
                 // 10. 监听映射 (Listener Mapping)
-                SwiftUI.Section(header: Text("监听映射"), footer: Text("手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点。例如：tcp://123.123.123.123:11223，可以指定多个。")) {
+                SwiftUI.Section(header: Text(LocalizedStringKey("监听映射")), footer: Text(LocalizedStringKey("手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点。例如：tcp://123.123.123.123:11223，可以指定多个。"))) {
                     stringListSection(list: $model.mappedListeners, placeholder: "URI (e.g. tcp://...)")
                 }
                 
                 // 11. 功能开关 (Feature Toggles)
-                SwiftUI.Section("功能开关") {
+                SwiftUI.Section(header: Text(LocalizedStringKey("功能开关"))) {
                     toggleRow("延迟优先模式", "忽略中转跳数，选择总延迟最低的路径。", isOn: $model.latencyFirst)
                     toggleRow("使用用户态协议栈", "使用用户态 TCP/IP 协议栈，避免操作系统防火墙问题导致无法子网代理 / KCP 代理。", isOn: $model.useSmoltcp)
                     
@@ -653,12 +657,12 @@ struct ConfigGeneratorView: View {
                 }
             }
             Button { list.wrappedValue.append("") } label: {
-                Label("添加", systemImage: "plus.circle.fill").foregroundColor(.blue)
+                Label(LocalizedStringKey("添加"), systemImage: "plus.circle.fill").foregroundColor(.blue)
             }.buttonStyle(.plain)
         }
     }
     
-    private func toggleRow(_ title: String, _ subtitle: String, isOn: Binding<Bool>) -> some View {
+    private func toggleRow(_ title: LocalizedStringKey, _ subtitle: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Toggle(title, isOn: isOn)
             Text(subtitle)
@@ -689,7 +693,7 @@ struct ConfigGeneratorView: View {
     // MARK: - Main View
     var mainView: some View {
         VStack(spacing: 0) {
-            header(title: "配置生成器", leftBtn: "取消", rightBtn: "生成") {
+            header(title: LocalizedStringKey("配置生成器"), leftBtn: LocalizedStringKey("取消"), leftRole: .destructive, rightBtn: LocalizedStringKey("生成")) {
                 // Clear draft on cancel so next open reads from disk
                 ConfigDraftManager.shared.clearDraft(for: editingFileURL)
                 withAnimation { isPresented = false }
@@ -699,12 +703,12 @@ struct ConfigGeneratorView: View {
             
             Form {
                 // Section 1: Virtual IPv4
-                Section("虚拟 IPv4 地址") {
-                    Toggle("DHCP", isOn: $model.dhcp)
+                Section(header: Text(LocalizedStringKey("虚拟 IPv4 地址"))) {
+                    Toggle(LocalizedStringKey("DHCP"), isOn: $model.dhcp)
                     
                     if !model.dhcp {
                         HStack(spacing: 0) {
-                            Text("地址")
+                            Text(LocalizedStringKey("地址"))
                             Spacer()
                             IPv4CidrField(ip: $model.ipv4, cidr: $model.cidr)
                                 .fixedSize() // 关键：使用固有尺寸，防止被拉伸，确保 Spacer 能将其推至最右
@@ -713,9 +717,9 @@ struct ConfigGeneratorView: View {
                 }
                 
                 // Section 2: Network & Peers (Merged as per screenshot)
-                Section("网络") {
+                Section(header: Text(LocalizedStringKey("网络"))) {
                     HStack {
-                        Text("名称")
+                        Text(LocalizedStringKey("名称"))
                         TextField("easytier", text: $model.networkName)
                             .multilineTextAlignment(.trailing)
                             .labelsHidden()
@@ -725,8 +729,8 @@ struct ConfigGeneratorView: View {
                     }
                     
                     HStack {
-                        Text("密码")
-                        TextField("选填", text: $model.networkSecret)
+                        Text(LocalizedStringKey("密码"))
+                        TextField(LocalizedStringKey("选填"), text: $model.networkSecret)
                             .multilineTextAlignment(.trailing)
                             .labelsHidden()
                             .frame(maxWidth: .infinity)
@@ -734,9 +738,9 @@ struct ConfigGeneratorView: View {
                             .disableAutocorrection(true)
                     }
                     
-                    Picker("节点模式", selection: $model.peerMode) {
+                    Picker(LocalizedStringKey("节点模式"), selection: $model.peerMode) {
                         ForEach(PeerMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
+                            Text(mode.localizedTitle).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -771,7 +775,7 @@ struct ConfigGeneratorView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
-                                Text("添加节点")
+                                Text(LocalizedStringKey("添加节点"))
                             }
                             .foregroundColor(.blue)
                         }
@@ -779,7 +783,7 @@ struct ConfigGeneratorView: View {
                         
                     } else if model.peerMode == .publicServer {
                         HStack {
-                            Text("服务器")
+                            Text(LocalizedStringKey("服务器"))
                             Spacer()
                             Text("tcp://public.easytier.top:11010")
                                 .foregroundColor(.secondary)
@@ -792,7 +796,7 @@ struct ConfigGeneratorView: View {
                 Section {
                     Button { push(.advanced) } label: {
                         HStack {
-                            Text("高级设置")
+                            Text(LocalizedStringKey("高级设置"))
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
@@ -804,7 +808,7 @@ struct ConfigGeneratorView: View {
                     
                     Button { push(.portForwarding) } label: {
                         HStack {
-                            Text("端口转发")
+                            Text(LocalizedStringKey("端口转发"))
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
@@ -824,7 +828,7 @@ struct ConfigGeneratorView: View {
     // MARK: - Port Forwarding (Image 1)
     var portForwardingView: some View {
         VStack(spacing: 0) {
-            header(title: "端口转发", leftBtn: "返回") { pop() }
+            header(title: LocalizedStringKey("端口转发"), leftBtn: LocalizedStringKey("返回"), leftRole: .cancel) { pop() }
             
             Form {
                 ForEach($model.portForwards) { $rule in
@@ -832,7 +836,7 @@ struct ConfigGeneratorView: View {
                         VStack(spacing: 12) {
                             // Protocol Row
                             HStack {
-                                Text("协议")
+                                Text(LocalizedStringKey("协议"))
                                 Spacer()
                                 Picker("", selection: $rule.protocolType) {
                                     Text("TCP").tag("TCP")
@@ -846,7 +850,7 @@ struct ConfigGeneratorView: View {
                             
                             // Bind Row
                             HStack {
-                                Text("绑定地址")
+                                Text(LocalizedStringKey("绑定地址"))
                                 Spacer()
                                 IPv4Field(ip: $rule.bindIp)
                                     .fixedSize()
@@ -863,7 +867,7 @@ struct ConfigGeneratorView: View {
                                 Image(systemName: "arrow.down")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                Text("转发到")
+                                Text(LocalizedStringKey("转发到"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 Spacer()
@@ -871,7 +875,7 @@ struct ConfigGeneratorView: View {
                             
                             // Target Row
                             HStack {
-                                Text("目标地址")
+                                Text(LocalizedStringKey("目标地址"))
                                 Spacer()
                                 IPv4Field(ip: $rule.targetIp)
                                     .fixedSize()
@@ -904,7 +908,7 @@ struct ConfigGeneratorView: View {
                     } label: {
                         HStack {
                             Image(systemName: "plus.circle.fill")
-                            Text("添加端口转发")
+                            Text(LocalizedStringKey("添加端口转发"))
                         }
                         .foregroundColor(.blue)
                     }
@@ -920,9 +924,9 @@ struct ConfigGeneratorView: View {
     
     // MARK: - Components
     
-    private func header(title: String, leftBtn: String, rightBtn: String? = nil, leftAction: @escaping () -> Void, rightAction: (() -> Void)? = nil) -> some View {
+    private func header(title: LocalizedStringKey, leftBtn: LocalizedStringKey, leftRole: ButtonRole? = .cancel, rightBtn: LocalizedStringKey? = nil, leftAction: @escaping () -> Void, rightAction: (() -> Void)? = nil) -> some View {
         UnifiedHeader(title: title) {
-            Button(leftBtn, role: leftBtn == "取消" ? .destructive : .cancel, action: leftAction)
+            Button(leftBtn, role: leftRole, action: leftAction)
                 .buttonStyle(.bordered)
         } right: {
             if let rightBtn = rightBtn, let rightAction = rightAction {

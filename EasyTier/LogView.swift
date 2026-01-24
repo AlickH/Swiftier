@@ -21,8 +21,8 @@ struct LogView: View {
             VStack(spacing: 0) {
                 HStack {
                     Picker("", selection: $viewMode) {
-                        Text("交互事件").tag(ViewMode.events)
-                        Text("调试日志").tag(ViewMode.logs)
+                        Text(LocalizedStringKey("交互事件")).tag(ViewMode.events)
+                        Text(LocalizedStringKey("调试日志")).tag(ViewMode.logs)
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 200)
@@ -65,7 +65,8 @@ struct LogView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(Color(nsColor: .windowBackgroundColor))
                 
                 Divider()

@@ -38,44 +38,46 @@ struct ContentView: View {
             if isWindowVisible {
                 VStack(spacing: 0) {
                     headerView
-                    if !isAnyOverlayShown {
-                        contentArea
-                    } else {
-                        // 覆盖层显示时，占位背景，不渲染复杂的 contentArea (含 Sparkline)
-                        Spacer()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    
+                    ZStack {
+                        if !isAnyOverlayShown {
+                            contentArea
+                        } else {
+                            // 覆盖层显示时，用透明占位保持几何结构稳固
+                            Color.clear
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(width: windowWidth, height: windowHeight)
+                .frame(width: windowWidth, height: windowHeight, alignment: .top)
+                .background(Color(nsColor: .windowBackgroundColor).opacity(0.01)) // 确保点击区域
             } else {
-                // 当后台运行时，仅保留最小占位，阻止 SwiftUI 大规模 Diff
                 Color.clear
                     .frame(width: windowWidth, height: windowHeight)
             }
             
+            // Generator and Editor overlays - Removed from isWindowVisible check to preserve state
             // 日志全屏覆盖层
-            // 优化：窗口隐藏时不渲染覆盖层
-            if showLogView && runner.isWindowVisible {
+            if showLogView {
                 LogView(isPresented: $showLogView)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)
-                    // Compositing Group forces atomic rendering, preventing "content float" artifacts during slide
                     .compositingGroup()
                     .zIndex(100)
                     .transition(.move(edge: .bottom))
             }
             
             // 设置全屏覆盖层
-            if showSettingsView && runner.isWindowVisible {
+            if showSettingsView {
                 SettingsView(isPresented: $showSettingsView)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)
-                    .zIndex(101) // 比日志层更高
+                    .zIndex(101)
                     .transition(.move(edge: .bottom))
             }
             
             // 编辑器全屏覆盖层
-            if let url = editingConfigURL, runner.isWindowVisible {
+            if let url = editingConfigURL {
                 ConfigEditorView(
                     isPresented: Binding(
                         get: { true },
@@ -85,13 +87,12 @@ struct ContentView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(.regularMaterial)
-                .zIndex(102) // 最高层级
+                .zIndex(102)
                 .transition(.move(edge: .bottom))
             }
             
             // 生成器全屏覆盖层
-            // 优化：只有显示时才创建，避免频繁初始化
-            if showConfigGenerator && isWindowVisible {
+            if showConfigGenerator {
                 ConfigGeneratorView(
                     isPresented: $showConfigGenerator,
                     editingFileURL: selectedConfig,
@@ -109,25 +110,25 @@ struct ContentView: View {
                     .onTapGesture { withAnimation { showCreatePrompt = false } }
                 
                 VStack(spacing: 20) {
-                    Text("创建新网络")
+                    Text(LocalizedStringKey("创建新网络"))
                         .font(.headline)
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("配置文件名:")
-                        TextField("例如: my-network", text: $newConfigName)
+                        Text(LocalizedStringKey("配置文件名:"))
+                        TextField(LocalizedStringKey("例如: my-network"), text: $newConfigName)
                             .textFieldStyle(.roundedBorder)
                             .textContentType(.none)
                             .disableAutocorrection(true)
                             .onSubmit { createConfig() }
-                        Text("将自动添加 .toml 后缀")
+                        Text(LocalizedStringKey("将自动添加 .toml 后缀"))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.horizontal)
                     
                     HStack {
-                        Button("取消") { withAnimation { showCreatePrompt = false } }
-                        Button("创建") { createConfig() }
+                        Button(LocalizedStringKey("取消")) { withAnimation { showCreatePrompt = false } }
+                        Button(LocalizedStringKey("创建")) { createConfig() }
                             .buttonStyle(.borderedProminent)
                             .disabled(newConfigName.isEmpty)
                     }
@@ -240,14 +241,14 @@ struct ContentView: View {
                 Divider()
                 
                 Button(role: .destructive) { deleteSelectedConfig() } label: {
-                    Text("删除选中的配置")
+                    Text(LocalizedStringKey("删除选中的配置"))
                         .foregroundColor(.red)
                 }
                 .disabled(selectedConfig == nil)
             } label: {
                 HStack {
                     Image(systemName: "point.3.connected.trianglepath.dotted")
-                    Text(selectedConfig?.deletingPathExtension().lastPathComponent ?? "请选择配置")
+                    Text(selectedConfig?.deletingPathExtension().lastPathComponent ?? NSLocalizedString("请选择配置", comment: ""))
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 8)
@@ -566,7 +567,7 @@ struct ContentView: View {
                     if runner.isRunning && runner.peers.isEmpty {
                         VStack(spacing: 20) {
                             ProgressView().scaleEffect(1.2).controlSize(.large)
-                            Text("节点加载中")
+                            Text(LocalizedStringKey("节点加载中"))
                                 .font(.title3.bold())
                                 .foregroundColor(.secondary)
                         }

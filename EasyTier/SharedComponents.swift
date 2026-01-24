@@ -5,11 +5,11 @@ import SwiftUI
 /// 统一风格的页面 Header 布局容器
 /// 仅负责布局结构，样式完全由内部按钮的系统 Style 决定
 struct UnifiedHeader<LeftBtn: View, RightBtn: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     let leftButton: () -> LeftBtn
     let rightButton: () -> RightBtn
     
-    init(title: String, @ViewBuilder left: @escaping () -> LeftBtn, @ViewBuilder right: @escaping () -> RightBtn) {
+    init(title: LocalizedStringKey, @ViewBuilder left: @escaping () -> LeftBtn, @ViewBuilder right: @escaping () -> RightBtn) {
         self.title = title
         self.leftButton = left
         self.rightButton = right
