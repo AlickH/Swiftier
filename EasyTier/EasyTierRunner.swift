@@ -13,22 +13,13 @@ final class EasyTierRunner: ObservableObject {
     @Published var uploadSpeed: String = "0 KB/s"
     @Published var maxHistorySpeed: Double = 1_048_576.0 // 缓存最大网速计算结果
     // 优化：窗口可见性变化时自动管理 Timer
-    @Published var isWindowVisible = true {
-        didSet {
-            guard oldValue != isWindowVisible else { return }
-            if isWindowVisible {
-                // 窗口显示，恢复 Timer
-                if isRunning {
-                    startUptimeTimer()
-                }
-            } else {
-                // 窗口隐藏，暂停 uptimeTimer（减少后台 CPU）
-                stopUptimeTimer()
-            }
-        }
-    }
+
+    @Published var isWindowVisible = true
 
     @Published var uptimeText: String = "00:00:00"
+    
+    // 公开最后一次数据更新的时间戳，供 UI 层做动画相位对齐
+    @Published private(set) var lastDataTime: Date = Date.distantPast
     
     private var startedAt: Date?
     
@@ -72,11 +63,80 @@ final class EasyTierRunner: ObservableObject {
     // Speed history for graphs
     @Published var downloadHistory: [Double] = Array(repeating: 0.0, count: 20)
     @Published var uploadHistory: [Double] = Array(repeating: 0.0, count: 20)
+    
+    // Subscriber & Polling Control
+    private var subscriberCount = 0
+    private var isAppActive = true
+    private var pollingTimer: AnyCancellable?
+    private let activeInterval: TimeInterval = 1.0
+    private let lowPowerInterval: TimeInterval = 5.0
 
     private init() {
-        // 启动时立即检查 Core 的真实运行状态
+        // App Lifecycle Monitoring
+        NotificationCenter.default.addObserver(self, selector: #selector(handleAppDidBecomeActive), name: NSApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleAppWillResignActive), name: NSApplication.willResignActiveNotification, object: nil)
+        
         syncWithCoreState()
     }
+    
+    @objc private func handleAppDidBecomeActive() {
+        print("[Runner] App Active -> High Perf Mode")
+        isAppActive = true
+        updatePollingMode()
+    }
+    
+    @objc private func handleAppWillResignActive() {
+        print("[Runner] App Background -> Low Power Mode")
+        isAppActive = false
+        updatePollingMode()
+    }
+    
+    func addSubscriber() {
+        subscriberCount += 1
+        updatePollingMode()
+    }
+    
+    func removeSubscriber() {
+        subscriberCount = max(0, subscriberCount - 1)
+        updatePollingMode()
+    }
+    
+    private func updatePollingMode() {
+        guard isRunning else {
+            pollingTimer?.cancel()
+            return
+        }
+        
+        // Relaxed Logic: If ANY view is subscribed (Window is open), run at high speed.
+        // Don't care if App is backgrounded/inactive (user might be looking at it while typing elsewhere).
+        let interval: TimeInterval
+        if subscriberCount > 0 {
+            interval = activeInterval
+        } else {
+            interval = lowPowerInterval
+        }
+        
+        // Restart timer only if interval changed or timer stopped
+        pollingTimer?.cancel()
+        
+        if #available(macOS 13.0, *) {
+            // Re-implement Timer logic for both versions to control interval strictly
+            pollingTimer = Timer.publish(every: interval, on: .main, in: .common)
+                .autoconnect()
+                .sink { [weak self] _ in
+                    self?.refreshPeersOnce()
+                }
+        } else {
+            // MacOS 12 Logic
+            pollingTimer = Timer.publish(every: interval, on: .main, in: .common)
+                .autoconnect()
+                .sink { [weak self] _ in
+                    self?.refreshPeersOnce()
+                }
+        }
+    }
+    
+    // ... syncWithCoreState ...
     
     func syncWithCoreState(completion: ((Bool) -> Void)? = nil) {
         let wasAlreadyRunning = self.isRunning
@@ -286,21 +346,11 @@ final class EasyTierRunner: ObservableObject {
 
     private func startMonitoring() {
         resetSpeedCounters()
-        timer?.cancel()
+        // We now rely on the unified polling timer which respects app state
+        updatePollingMode()
         
-        if #available(macOS 13.0, *) {
-            HelperManager.shared.setPushHandler { [weak self] jsonStr in
-                self?.processRunningInfo(jsonStr)
-            }
-            refreshPeersOnce()
-        } else {
-             // Fallback for older macOS (Timer based)
-             timer = Timer.publish(every: 1.0, on: .main, in: .common)
-                 .autoconnect()
-                 .sink { [weak self] _ in
-                     self?.refreshPeersOnce()
-                 }
-        }
+        // Initial fetch
+        refreshPeersOnce()
     }
     
     private func resetSpeedCounters() {
@@ -321,18 +371,30 @@ final class EasyTierRunner: ObservableObject {
         }
     }
 
+    private var throttleInterval: TimeInterval = 0.8
+    
+    // 开启/关闭高频刷新模式（用于启动时的丝滑动画）
+    func setWarmUpMode(_ enabled: Bool) {
+        // 0.05s 允许最高 20FPS
+        self.throttleInterval = enabled ? 0.05 : 0.8
+        print("[Runner] WarmUp Mode: \(enabled)")
+    }
+    
+    // 公开的手动刷新接口
+    func forceRefresh() {
+        refreshPeersOnce()
+    }
+
     private func processRunningInfo(_ jsonStr: String) {
         let now = Date()
-        // 性能优化：限制解析频率最高为每 0.8 秒一次，避免高频 Push 导致 CPU 飙升
-        guard now.timeIntervalSince(lastProcessingTime) >= 0.8 else {
+        // 动态频率限制
+        guard now.timeIntervalSince(lastProcessingTime) >= throttleInterval else {
             return
         }
         
-        // 静默模式：窗口隐藏时跳过所有处理，只保留时间戳以便恢复时计算
-        guard isWindowVisible else {
-            lastPollTime = now
-            return
-        }
+        // 静默模式检查已移除：后台也要持续计算流量历史，保证开窗即用，数据连贯。
+        // SwiftUI 会自动处理 View 的渲染暂停，所以纯数据处理 CPU 开销极低。
+        // guard isWindowVisible else { ... }
         
         lastProcessingTime = now
         guard let data = jsonStr.data(using: .utf8) else { return }
@@ -441,6 +503,10 @@ final class EasyTierRunner: ObservableObject {
         self.lastTotalRx = totalRx
         self.lastTotalTx = totalTx
         self.lastPollTime = now
+        // Update public timestamp for UI phase sync
+        DispatchQueue.main.async {
+            self.lastDataTime = now
+        }
         
         // 5. 排序并发布 UI 列表
         let sorted = fetchedPeers.sorted { p1, p2 in

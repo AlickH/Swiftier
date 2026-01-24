@@ -407,7 +407,7 @@ struct ContentView: View {
             ZStack(alignment: .bottom) {
                 // Sparkline (Background layer) - UIKit 高性能实现
                 // 当整体可见时，传入 paused=false
-                SparklineView(data: history, color: color, maxScale: maxVal, paused: isPaused)
+                SmartSparklineView(data: history, color: color, maxScale: maxVal, paused: isPaused)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 24)
                     .zIndex(0)
@@ -580,138 +580,17 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Sparkline Component (连续滚动折线图 - 类似 Surge)
-    // 使用低帧率 TimelineView + 插值实现平滑滚动效果
+    // MARK: - Sparkline Component (Wrapper for External Implementation)
     struct Sparkline: View {
         let data: [Double]
         let color: Color
         let maxScale: Double
         let paused: Bool
-        
-        @State private var lastData: [Double] = []
-        @State private var lastUpdateTime: Date = Date()
-        
+
         var body: some View {
-            if paused {
-                Color.clear
-            } else {
-                // 8 FPS 的 TimelineView，更低 CPU 开销
-                TimelineView(.periodic(from: .now, by: 1.0 / 8.0)) { timeline in
-                    Canvas { context, size in
-                        let now = timeline.date
-                        let timeSinceUpdate = now.timeIntervalSince(lastUpdateTime)
-                        // 1秒内的插值进度 (0.0 ~ 1.0)
-                        let progress = min(timeSinceUpdate, 1.0)
-                        
-                        let w = size.width
-                        let h = size.height
-                        let range = max(maxScale, 0.001)
-                        let rightPad: CGFloat = 8.0
-                        let stepX = data.count > 1 ? (w - rightPad) / CGFloat(data.count - 1) : w
-                        let strokeWidth: CGFloat = 2.5
-                        let bottomPad: CGFloat = strokeWidth / 2 + 1
-                        let topPad: CGFloat = 8.0
-                        let availableH = h - bottomPad - topPad
-                        
-                        guard data.count > 1 else { return }
-                        
-                        // 计算基础点坐标
-                        var points: [CGPoint] = data.enumerated().map { i, val in
-                            let x = CGFloat(i) * stepX
-                            let y = h - bottomPad - (CGFloat(val / range) * availableH)
-                            return CGPoint(x: x, y: max(topPad, min(h - bottomPad, y)))
-                        }
-                        
-                        // 最后一个点的 Y 轴插值（从前一个点过渡到当前值）
-                        if points.count >= 2 && lastData.count >= data.count {
-                            let lastIdx = points.count - 1
-                            let prevY = h - bottomPad - (CGFloat(lastData[lastIdx] / range) * availableH)
-                            let targetY = points[lastIdx].y
-                            points[lastIdx].y = prevY + (targetY - prevY) * CGFloat(progress)
-                        }
-                        
-                        // 水平滚动偏移（从右向左滑入）
-                        let scrollOffset = (1.0 - progress) * stepX
-                        
-                        // 应用裁剪区域
-                        let clipRect = CGRect(x: 0, y: 0, width: w - rightPad, height: h)
-                        context.clip(to: Path(roundedRect: clipRect, cornerRadius: 8))
-                        
-                        // 平移整个图表
-                        context.translateBy(x: scrollOffset, y: 0)
-                        
-                        // 幽灵点（左侧延伸）
-                        let ghostX = -stepX
-                        let ghostY = points.first?.y ?? (h - bottomPad)
-                        
-                        // 折线路径
-                        var linePath = Path()
-                        linePath.move(to: CGPoint(x: ghostX, y: ghostY))
-                        for point in points {
-                            linePath.addLine(to: point)
-                        }
-                        
-                        // 填充路径
-                        var fillPath = Path()
-                        fillPath.move(to: CGPoint(x: ghostX, y: h))
-                        fillPath.addLine(to: CGPoint(x: ghostX, y: ghostY))
-                        for point in points {
-                            fillPath.addLine(to: point)
-                        }
-                        if let last = points.last {
-                            fillPath.addLine(to: CGPoint(x: last.x, y: h))
-                        }
-                        fillPath.closeSubpath()
-                        
-                        // 渐变填充
-                        context.fill(fillPath, with: .linearGradient(
-                            Gradient(colors: [color.opacity(0.25), color.opacity(0.02)]),
-                            startPoint: .zero,
-                            endPoint: CGPoint(x: 0, y: h)
-                        ))
-                        
-                        // 折线描边
-                        context.stroke(linePath, with: .color(color), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
-                        
-                        // 端点脉冲动画
-                        if let lastPoint = points.last {
-                            let t = now.timeIntervalSinceReferenceDate
-                            let pulseProg = (t.truncatingRemainder(dividingBy: 0.8)) / 0.8
-                            let pulseRadius = 4.0 + (10.0 * pulseProg)
-                            let pulseOpacity = 0.4 * (1.0 - pulseProg)
-                            
-                            // 脉冲环
-                            context.stroke(
-                                Path(ellipseIn: CGRect(x: lastPoint.x - pulseRadius, y: lastPoint.y - pulseRadius,
-                                                      width: pulseRadius * 2, height: pulseRadius * 2)),
-                                with: .color(color.opacity(pulseOpacity)),
-                                lineWidth: 1.5
-                            )
-                            
-                            // 外发光
-                            let glowRect = CGRect(x: lastPoint.x - 7, y: lastPoint.y - 7, width: 14, height: 14)
-                            context.fill(Path(ellipseIn: glowRect), with: .color(color.opacity(0.2)))
-                            
-                            // 主圆点
-                            let dotRect = CGRect(x: lastPoint.x - 3.5, y: lastPoint.y - 3.5, width: 7, height: 7)
-                            context.fill(Path(ellipseIn: dotRect), with: .color(color))
-                            context.stroke(Path(ellipseIn: dotRect), with: .color(.white), lineWidth: 1.5)
-                        }
-                    }
-                    .drawingGroup()
-                }
-                .onChange(of: data) { newData in
-                    lastData = data
-                    lastUpdateTime = Date()
-                }
-                .onAppear {
-                    lastData = data
-                    lastUpdateTime = Date()
-                }
-            }
+            SmartSparklineView(data: data, color: color, maxScale: maxScale, paused: paused)
         }
     }
-    
     
     // MARK: - Helper Functions
     
