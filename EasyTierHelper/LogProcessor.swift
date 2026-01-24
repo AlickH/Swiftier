@@ -1,31 +1,17 @@
 import Foundation
 
-/// 高亮范围元数据 (与 App 侧对齐)
-struct HighlightRange: Codable {
-    let start: Int
-    let length: Int
-    let color: String
-    let bold: Bool
-}
-
-/// 已处理的事件格式 (与 App 侧 EventEntry 对齐)
-struct ProcessedEvent: Codable {
-    let id: UUID
-    let timestamp: String
-    let time: Date?
-    let type: String
-    let details: String
-    let highlights: [HighlightRange]
-}
-
 class LogProcessor {
     static let shared = LogProcessor()
     
     private let maxEventItems = 500
     private var processedEvents: [ProcessedEvent] = []
+    
+    // totalGlobalIndex tracks the number of events processed during the current CORE life cycle.
+    // When the Core restarts, this is reset to 0 to signal the App to clear its history.
+    private var totalGlobalIndex = 0
     private let lock = NSLock()
     
-    // 之前在 App 里打磨好的正则规则
+    // Regex for cleaning up terminal codes
     private let ansiRegex = try! NSRegularExpression(pattern: "(\\x1B\\[[0-9;]*[a-zA-Z])|(\\[[0-9;]+m)", options: [])
     
     private init() {}
@@ -34,6 +20,36 @@ class LogProcessor {
         lock.lock()
         defer { lock.unlock() }
         return processedEvents
+    }
+    
+    /// 获取从指定索引后的所有事件，并序列化为 JSON Data
+    func getSerializedEvents(sinceIndex: Int) -> (Data, Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        let bufferStartIndex = max(0, totalGlobalIndex - processedEvents.count)
+        
+        let requestedEvents: [ProcessedEvent]
+        if sinceIndex >= totalGlobalIndex {
+            requestedEvents = []
+        } else if sinceIndex < bufferStartIndex {
+            // App missed some events or just started, send current buffer
+            requestedEvents = processedEvents
+        } else {
+            let offsetInBuffer = sinceIndex - bufferStartIndex
+            requestedEvents = Array(processedEvents.dropFirst(offsetInBuffer))
+        }
+        
+        let data = (try? JSONEncoder().encode(requestedEvents)) ?? Data()
+        return (data, totalGlobalIndex)
+    }
+    
+    /// Reset the processor for a new Core life cycle
+    func clear() {
+        lock.lock()
+        defer { lock.unlock() }
+        processedEvents.removeAll()
+        totalGlobalIndex = 0
     }
 
     /// 处理从日志中提取的原始行
@@ -77,6 +93,7 @@ class LogProcessor {
         
         lock.lock()
         processedEvents.append(event)
+        totalGlobalIndex += 1
         if processedEvents.count > maxEventItems {
             processedEvents.removeFirst()
         }

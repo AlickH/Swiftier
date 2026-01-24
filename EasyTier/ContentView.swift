@@ -38,8 +38,13 @@ struct ContentView: View {
             if isWindowVisible {
                 VStack(spacing: 0) {
                     headerView
-                    //Divider()
-                    contentArea
+                    if !isAnyOverlayShown {
+                        contentArea
+                    } else {
+                        // 覆盖层显示时，占位背景，不渲染复杂的 contentArea (含 Sparkline)
+                        Spacer()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
                 .frame(width: windowWidth, height: windowHeight)
             } else {

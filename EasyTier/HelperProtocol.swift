@@ -49,8 +49,8 @@ public protocol HelperProtocol {
     /// 获取最近的 JSON 事件（用于实时事件流）
     /// - Parameters:
     ///   - sinceIndex: 从哪个索引开始获取（0 表示获取所有缓存的事件）
-    ///   - reply: 回调，返回 (JSON 事件数组, 下一个索引)
-    func getRecentEvents(sinceIndex: Int, reply: @escaping ([String], Int) -> Void)
+    ///   - reply: 回调，返回 (序列化的 JSON Data, 下一个索引)
+    func getRecentEvents(sinceIndex: Int, reply: @escaping (Data, Int) -> Void)
     
     /// 退出 Helper 进程
     func quitHelper(reply: @escaping (Bool) -> Void)
@@ -63,5 +63,42 @@ public protocol HelperProtocol {
 /// Helper 的 Mach 服务名称
 public let kHelperMachServiceName = "com.alick.swiftier.helper"
 /// Helper 的目标版本号 (Helper Protocol 版本) - 升级以触发自动更新
-public let kTargetHelperVersion = "1.3.8"
+public let kTargetHelperVersion = "1.3.9"
+
+
+// MARK: - Shared Data Structures
+
+/// 高亮范围元数据 (与 App 侧对齐)
+public struct HighlightRange: Codable, Equatable {
+    public let start: Int
+    public let length: Int
+    public let color: String
+    public let bold: Bool
+    
+    public init(start: Int, length: Int, color: String, bold: Bool) {
+        self.start = start
+        self.length = length
+        self.color = color
+        self.bold = bold
+    }
+}
+
+/// 已处理的事件格式 (与 App 侧 EventEntry 对齐)
+public struct ProcessedEvent: Codable {
+    public let id: UUID
+    public let timestamp: String
+    public let time: Date?
+    public let type: String
+    public let details: String
+    public let highlights: [HighlightRange]
+    
+    public init(id: UUID, timestamp: String, time: Date?, type: String, details: String, highlights: [HighlightRange]) {
+        self.id = id
+        self.timestamp = timestamp
+        self.time = time
+        self.type = type
+        self.details = details
+        self.highlights = highlights
+    }
+}
 

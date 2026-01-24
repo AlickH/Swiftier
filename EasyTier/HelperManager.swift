@@ -336,15 +336,20 @@ final class HelperManager {
     /// - Parameters:
     ///   - sinceIndex: 从哪个索引开始获取
     ///   - completion: 回调，返回 (JSON 事件数组, 下一个索引)
-    func getRecentEvents(sinceIndex: Int, completion: @escaping ([String], Int) -> Void) {
+    func getRecentEvents(sinceIndex: Int, completion: @escaping ([ProcessedEvent], Int) -> Void) {
         guard let helper = getHelper() else {
             completion([], sinceIndex)
             return
         }
         
-        helper.getRecentEvents(sinceIndex: sinceIndex) { events, nextIndex in
-            DispatchQueue.main.async {
-                completion(events, nextIndex)
+        helper.getRecentEvents(sinceIndex: sinceIndex) { data, nextIndex in
+            Task {
+                // Decode on background thread implicitly or MainActor later?
+                // Helper sends Data. We decode.
+                let events = (try? JSONDecoder().decode([ProcessedEvent].self, from: data)) ?? []
+                await MainActor.run {
+                    completion(events, nextIndex)
+                }
             }
         }
     }

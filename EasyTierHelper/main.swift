@@ -13,21 +13,21 @@ import Foundation
 let kHelperMachServiceName = "com.alick.swiftier.helper"
 
 /// Helper 版本号（用于检测是否需要升级）
-let kHelperVersion = "1.3.8"
+let kHelperVersion = "1.3.9"
 
 // MARK: - Logger
 
 let logPath = "/var/log/swiftier-helper.log"
 
 func setupLogging() {
-    // Log Rotation: Check if size > 10MB only at startup
-    // This avoids conflict with Rust core which keeps the file handle open
-    if let attrs = try? FileManager.default.attributesOfItem(atPath: logPath),
-       let size = attrs[.size] as? UInt64, size > 10 * 1024 * 1024 {
-        let bakPath = logPath + ".bak"
-        try? FileManager.default.removeItem(atPath: bakPath)
-        try? FileManager.default.moveItem(atPath: logPath, toPath: bakPath)
-    }
+    // 强制截断日志，开始全新的 Helper 生命周期
+    let url = URL(fileURLWithPath: logPath)
+    try? "".write(to: url, atomically: true, encoding: .utf8)
+    
+    // 同时清空处理器缓存
+    LogProcessor.shared.clear()
+    
+    log("Helper process started, log truncated.")
 }
 
 func log(_ message: String) {
@@ -152,18 +152,28 @@ class CoreProcessManager {
         stateLock.lock()
         defer { stateLock.unlock() }
         
-        // 1. Setup Logger
-        initRustLogger(level: consoleLevel)
-        clearEvents()
+        // 1. Reset logs and events for THIS core session
+        let url = URL(fileURLWithPath: logPath)
+        try? "".write(to: url, atomically: true, encoding: .utf8)
+        lastLogOffset = 0
+        if let handle = logFileHandle {
+            try? handle.seek(toOffset: 0)
+        }
         
-        // 2. Read Config
+        LogProcessor.shared.clear()
+        
+        // 2. Setup Logger
+        initRustLogger(level: consoleLevel)
+        clearEvents() // Clear the old String buffer too
+        
+        // 3. Read Config
         guard FileManager.default.fileExists(atPath: configPath) else {
             throw NSError(domain: "HelperError", code: 2,
                          userInfo: [NSLocalizedDescriptionKey: "Config file not found: \(configPath)"])
         }
         let configStr = try String(contentsOfFile: configPath, encoding: .utf8)
         
-        // 3. Start Core
+        // 4. Start Core
         if isVPNActive {
              EasyTierCore.shared.stopNetwork()
         }
@@ -245,39 +255,16 @@ class CoreProcessManager {
     }
     
     private func processLogChunk(_ chunk: String) {
-        // Split by newline
-        // Note: Simple split might break lines if chunk ends in middle of line.
-        // Ideally we should buffer incomplete lines.
-        // For MVP, assuming line buffering or lucky chunking.
-        // (A robust solution tracks a residual buffer)
-        
         let lines = chunk.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             
-            // Check for JSON event
-            if trimmed.contains("\"event\"") && trimmed.contains("{") {
-                // Determine if it's a JSON line. 
-                // Rust tracing logs might look like: "TIMESTAMP INFO ... {event...}"
-                // We need to extract the JSON part if it's mixed.
-                // But easytier-core usually prints pure JSON lines for events if configured?
-                // `register_running_info_callback` logic suggests we pull state.
-                // But here we rely on log.
-                // If the log is JSON structured (e.g. `tracing_subscriber::fmt::format::Json`), then the whole line is JSON.
-                // Our `init_logger` uses `OsLogger` (os_log) and a File writer with `tracing_subscriber::fmt::layer()`.
-                // Default fmt is not JSON. So we see text logs.
-                // Unless EasyTier prints events to stdout explicitly via `println!`.
-                
-                // If raw JSON is inside the log message:
-                // [2023-...] INFO ... msg={"event":...}
-                
-                // Try to find first '{'
-                if let firstBrace = trimmed.firstIndex(of: "{") {
-                    let jsonPart = String(trimmed[firstBrace...])
-                    addEvent(jsonPart)
-                }
-            }
+            // Feed to LogProcessor for sophisticated parsing and highlighting
+            LogProcessor.shared.processRawLine(trimmed)
+            
+            // Legacy internal event tracking (optional, kept for now if you revert)
+            // if trimmed.contains("\"event\"") && trimmed.contains("{") { ... }
         }
     }
 }
@@ -300,7 +287,7 @@ protocol HelperProtocol {
     func getCoreStatus(reply: @escaping (Int32) -> Void)
     func getCoreStartTime(reply: @escaping (Double) -> Void)
     func getVersion(reply: @escaping (String) -> Void)
-    func getRecentEvents(sinceIndex: Int, reply: @escaping ([String], Int) -> Void)
+    func getRecentEvents(sinceIndex: Int, reply: @escaping (Data, Int) -> Void)
     func quitHelper(reply: @escaping (Bool) -> Void)
     func getRunningInfo(reply: @escaping (String?) -> Void)
 }
@@ -418,9 +405,10 @@ class HelperDelegate: NSObject, NSXPCListenerDelegate, HelperProtocol {
         reply(kHelperVersion)
     }
     
-    func getRecentEvents(sinceIndex: Int, reply: @escaping ([String], Int) -> Void) {
-        let (events, nextIndex) = CoreProcessManager.shared.getEvents(sinceIndex: sinceIndex)
-        reply(events, nextIndex)
+    func getRecentEvents(sinceIndex: Int, reply: @escaping (Data, Int) -> Void) {
+        // Now delegating to LogProcessor for structured data
+        let (data, nextIndex) = LogProcessor.shared.getSerializedEvents(sinceIndex: sinceIndex)
+        reply(data, nextIndex)
     }
     
     func quitHelper(reply: @escaping (Bool) -> Void) {

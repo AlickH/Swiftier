@@ -26,7 +26,6 @@ struct MenuBarLabelView: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: iconState.currentIcon)
-                .symbolRenderingMode(.hierarchical)
         }
     }
 }
