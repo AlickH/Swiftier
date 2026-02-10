@@ -8,10 +8,52 @@ class ConfigManager: ObservableObject {
     
     @Published var configFiles: [URL] = []
     @AppStorage("custom_config_path") var customPathString: String = ""
-    
+    @AppStorage("custom_config_bookmark") var customPathBookmark: Data?
+
     var currentDirectory: URL? {
-        if customPathString.isEmpty { return nil }
-        return URL(fileURLWithPath: customPathString)
+        if let bookmark = customPathBookmark {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                if isStale {
+                    // Update stale bookmark if needed
+                    if let newBookmark = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+                        DispatchQueue.main.async { self.customPathBookmark = newBookmark }
+                    }
+                }
+                return url
+            }
+        }
+        
+        if !customPathString.isEmpty {
+            return URL(fileURLWithPath: customPathString)
+        }
+        
+        // 自动探测 iCloud 路径作为默认值
+        if let drive = iCloudDriveURL {
+            let targetDir = drive.appendingPathComponent("Swiftier")
+            // 确保目录存在
+            if !FileManager.default.fileExists(atPath: targetDir.path) {
+                try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+            }
+            return targetDir
+        }
+        
+        return nil
+    }
+
+    private init() {
+        // 首次运行或未设置路径时，自动尝试初始化 iCloud
+        if customPathString.isEmpty {
+            if let drive = iCloudDriveURL {
+                let targetDir = drive.appendingPathComponent("Swiftier")
+                if !FileManager.default.fileExists(atPath: targetDir.path) {
+                    try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+                }
+                // 自动将 iCloud 路径设为默认路径
+                self.customPathString = targetDir.path
+            }
+        }
+        refreshConfigs()
     }
 
     func selectCustomFolder() {
@@ -22,6 +64,12 @@ class ConfigManager: ObservableObject {
         if panel.runModal() == .OK {
             if let url = panel.url {
                 self.customPathString = url.path
+                
+                // 沙盒适配：保存安全域书签 (Security Scoped Bookmark)
+                if let bookmark = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+                    self.customPathBookmark = bookmark
+                }
+                
                 self.refreshConfigs()
             }
         }
@@ -102,10 +150,14 @@ class ConfigManager: ObservableObject {
 
     @discardableResult
     func refreshConfigs() -> [URL] {
-        guard let url = currentDirectory else { 
+        guard let url = currentDirectory else {
             DispatchQueue.main.async { self.configFiles = [] }
-            return [] 
+            return []
         }
+        
+        let isScoped = url.startAccessingSecurityScopedResource()
+        defer { if isScoped { url.stopAccessingSecurityScopedResource() } }
+        
         do {
             let items = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
             let tomlFiles = items.filter { $0.pathExtension == "toml" }.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })

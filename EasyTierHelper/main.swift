@@ -191,10 +191,16 @@ class CoreProcessManager {
         
         if !isVPNActive { return }
         
-        EasyTierCore.shared.stopNetwork()
+        // Use a background queue to call stopNetwork, as FFI calls might block
+        DispatchQueue.global(qos: .userInitiated).async {
+            log("Calling stopNetwork FFI...")
+            EasyTierCore.shared.stopNetwork()
+            log("stopNetwork FFI returned.")
+        }
+        
         isVPNActive = false
         coreStartTime = nil
-        log("Stopped EasyTier Core")
+        log("EasyTier Core stop initiated")
     }
     
     // MARK: - Log Monitoring

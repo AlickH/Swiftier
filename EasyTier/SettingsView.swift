@@ -9,7 +9,7 @@ struct SettingsView: View {
     @AppStorage("breathEffect") private var breathEffect: Bool = true
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("exitBehavior") private var exitBehavior: String = "stopCore" // keepRunning, stopCore, stopAll
-    @AppStorage("logLevel") private var logLevel: String = "TRACE"
+    @AppStorage("logLevel") private var logLevel: String = "INFO"
     
     @ObservedObject private var permissionManager = PermissionManager.shared
     

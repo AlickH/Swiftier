@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var showCreatePrompt = false
     @State private var showFDAOverlay = false
     @State private var newConfigName = ""
+    @State private var createConfigError: String?
     
     private let windowWidth: CGFloat = 420
     private let windowHeight: CGFloat = 520
@@ -113,6 +114,14 @@ struct ContentView: View {
                     Text(LocalizedStringKey("创建新网络"))
                         .font(.headline)
                     
+                    if let error = createConfigError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    
                     VStack(alignment: .leading, spacing: 8) {
                         Text(LocalizedStringKey("配置文件名:"))
                         TextField(LocalizedStringKey("例如: my-network"), text: $newConfigName)
@@ -127,7 +136,12 @@ struct ContentView: View {
                     .padding(.horizontal)
                     
                     HStack {
-                        Button(LocalizedStringKey("取消")) { withAnimation { showCreatePrompt = false } }
+                        Button(LocalizedStringKey("取消")) {
+                            withAnimation {
+                                showCreatePrompt = false
+                                createConfigError = nil
+                            }
+                        }
                         Button(LocalizedStringKey("创建")) { createConfig() }
                             .buttonStyle(.borderedProminent)
                             .disabled(newConfigName.isEmpty)
@@ -216,6 +230,7 @@ struct ContentView: View {
                 
                 Button("创建新网络") {
                     newConfigName = ""
+                    createConfigError = nil
                     withAnimation { showCreatePrompt = true }
                 }
                 
@@ -624,8 +639,16 @@ struct ContentView: View {
         disable_encryption = false
         """
         
-        guard let currentDir = configManager.currentDirectory else { return }
+        guard let currentDir = configManager.currentDirectory else {
+            createConfigError = "请先在菜单中选择配置文件夹"
+            return
+        }
         let fileURL = currentDir.appendingPathComponent(filename)
+        
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            createConfigError = "文件已存在: \(filename)"
+            return
+        }
         
         do {
             try header.write(to: fileURL, atomically: true, encoding: .utf8)
@@ -643,6 +666,7 @@ struct ContentView: View {
                 withAnimation { showCreatePrompt = false }
             }
         } catch {
+            createConfigError = "创建失败: \(error.localizedDescription)"
             print("Failed to create file: \(error)")
         }
     }
@@ -774,24 +798,24 @@ struct FDAGuideView: View {
 
 // MARK: - Native Horizontal Scroller (Fixes SwiftUI vertical bounce bug on Mac)
 // MARK: - Native Horizontal Scroller (The Nuclear Option)
+class HorizontalOnlyScrollView: NSScrollView {
+    override func scrollWheel(with event: NSEvent) {
+        // Logic: Swallow vertical-dominant events to prevent bounce propagation.
+        // Allow horizontal events to pass through naturally.
+        
+        if abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) {
+            // Dominantly vertical: Swallow the event.
+            // Do NOT call super. This stops scrolling AND stops bounce propagation upwards.
+        } else {
+            // Dominantly horizontal (or zero/stationary): Pass it to the scroll view to handle.
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
 struct NativeHorizontalScroller<Content: View>: NSViewRepresentable {
     let content: Content
     init(@ViewBuilder content: @escaping () -> Content) { self.content = content() }
-    
-    class HorizontalOnlyScrollView: NSScrollView {
-        override func scrollWheel(with event: NSEvent) {
-            // Logic: Swallow vertical-dominant events to prevent bounce propagation.
-            // Allow horizontal events to pass through naturally.
-            
-            if abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) {
-                // Dominantly vertical: Swallow the event.
-                // Do NOT call super. This stops scrolling AND stops bounce propagation upwards.
-            } else {
-                // Dominantly horizontal (or zero/stationary): Pass it to the scroll view to handle.
-                super.scrollWheel(with: event)
-            }
-        }
-    }
     
     func makeNSView(context: Context) -> NSScrollView {
         let scroller = HorizontalOnlyScrollView() // Use our subclass

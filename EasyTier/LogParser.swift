@@ -48,13 +48,12 @@ class LogParser: ObservableObject {
     }()
 
     func startMonitoring() {
-        // Source 1: XPC Events (Structured, Pre-colored, Real-time)
+        // Source 1: XPC Events (Structured, Real-time)
+        // In Sandbox mode, we cannot read /var/log/ directly.
+        // We rely entirely on XPC to get logs from the Helper.
         if #available(macOS 13.0, *) {
             startXPCEventPolling()
         }
-        
-        // Source 2: Raw Logs (Text-only, On-demand)
-        startRawLogMonitoring()
     }
     
     @available(macOS 13.0, *)
@@ -92,7 +91,7 @@ class LogParser: ObservableObject {
                     date: pe.time,
                     type: type,
                     details: pe.details,
-                    highlights: pe.highlights
+                    highlights: self.calculateHighlights(for: pe.details)
                 )
             }
             
@@ -106,34 +105,7 @@ class LogParser: ObservableObject {
     }
 
     private func startRawLogMonitoring() {
-        guard FileManager.default.fileExists(atPath: logPath) else { return }
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            do {
-                let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: self.logPath))
-                let endOffset = handle.seekToEndOfFile()
-                
-                // Read last 500KB for the initial view (don't overdo it)
-                let readSize: UInt64 = 512 * 1024
-                let startOffset = (endOffset > readSize) ? (endOffset - readSize) : 0
-                try handle.seek(toOffset: startOffset)
-                
-                let data = handle.readDataToEndOfFile()
-                if let content = String(data: data, encoding: .utf8) {
-                    let parsed = self.quickParseLogs(content)
-                    DispatchQueue.main.async {
-                        self.logs = parsed
-                        self.fileHandle = handle
-                        self.timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                            self?.readNewRawLines()
-                        }
-                    }
-                }
-            } catch {
-                print("Failed to open logs: \(error)")
-            }
-        }
+        // Removed for Sandbox compatibility
     }
     
     // MARK: - Pre-compiled Regex Cache (Optimized for performance)
@@ -160,7 +132,7 @@ class LogParser: ObservableObject {
         let now = ISO8601DateFormatter().string(from: Date())
         
         // 获取全局设置级别
-        let settingLevelStr = UserDefaults.standard.string(forKey: "logLevel") ?? "TRACE"
+        let settingLevelStr = UserDefaults.standard.string(forKey: "logLevel") ?? "INFO"
         let levelMap: [String: Int] = ["OFF": 0, "ERROR": 1, "WARN": 2, "INFO": 3, "DEBUG": 4, "TRACE": 5]
         let currentLevelValue = levelMap[settingLevelStr.uppercased()] ?? 5
         
@@ -221,22 +193,7 @@ class LogParser: ObservableObject {
     }
     
     private func readNewRawLines() {
-        guard let handle = fileHandle, !isReading, !isPaused else { return }
-        isReading = true
-        
-        let data = handle.readDataToEndOfFile()
-        if !data.isEmpty, let chunk = String(data: data, encoding: .utf8) {
-            let news = quickParseLogs(chunk)
-            DispatchQueue.main.async {
-                self.logs.append(contentsOf: news)
-                if self.logs.count > self.maxLogItems {
-                    self.logs.removeFirst(self.logs.count - self.maxLogItems)
-                }
-                self.isReading = false
-            }
-        } else {
-            isReading = false
-        }
+        // Removed for Sandbox compatibility
     }
     
     func stopMonitoring() {

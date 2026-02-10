@@ -3,7 +3,7 @@ import Foundation
 class LogProcessor {
     static let shared = LogProcessor()
     
-    private let maxEventItems = 500
+    private let maxEventItems = 100 // Reduced from 500 to save memory
     private var processedEvents: [ProcessedEvent] = []
     
     // totalGlobalIndex tracks the number of events processed during the current CORE life cycle.
@@ -80,7 +80,7 @@ class LogProcessor {
         
         let type = eventName ?? "unknown"
         let detailsStr = collapsePrettyPrintedArrays(formatAsJson(eventData))
-        let highlights = calculateHighlights(for: detailsStr)
+        // DEFERRED: Highlights calculation moved to App side to save Helper memory
         
         let event = ProcessedEvent(
             id: UUID(),
@@ -88,7 +88,7 @@ class LogProcessor {
             time: ISO8601DateFormatter().date(from: timeStr),
             type: type,
             details: detailsStr,
-            highlights: highlights
+            highlights: [] // Empty here, calculated by App
         )
         
         lock.lock()
