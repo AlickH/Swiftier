@@ -122,7 +122,8 @@ final class SwiftierRunner: ObservableObject {
             case .connected:
                 if !self.isRunning {
                     self.isRunning = true
-                    self.startedAt = Date() // Approximate start time if not tracking precisely
+                    // 使用 NE 的实际连接时间，而非 App 启动时间
+                    self.startedAt = VPNManager.shared.connectedDate ?? Date()
                     self.startUptimeTimer()
                     self.startMonitoring()
                 }

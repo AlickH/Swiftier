@@ -14,6 +14,11 @@ class VPNManager: ObservableObject {
         manager?.isOnDemandEnabled ?? false
     }
     
+    /// NE 隧道的实际连接时间
+    var connectedDate: Date? {
+        manager?.connection.connectedDate
+    }
+    
     private var manager: NETunnelProviderManager?
     
     init() {
