@@ -137,17 +137,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func syncStateOnLaunch() {
         let vpn = VPNManager.shared
+        let connectOnStart = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
         print("[Launch] VPN status: \(vpn.status.rawValue), isConnected: \(vpn.isConnected), onDemand: \(vpn.isOnDemandEnabled)")
         
         // 同步 Runner 的 UI 状态
         SwiftierRunner.shared.syncWithVPNState()
         
-        // 确保 On Demand 规则与用户设置一致
-        let connectOnStart = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
-        vpn.updateOnDemand(enabled: connectOnStart)
+        // 如果 NE 已经在运行，不做任何操作，避免 saveToPreferences 导致隧道重启
+        if vpn.isConnected || vpn.status == .connecting {
+            print("[Launch] NE already running, skip")
+            return
+        }
         
-        // 如果 NE 未运行且开启了自动连接，手动触发一次（首次安装或 On Demand 尚未生效时）
-        if !vpn.isConnected && vpn.status != .connecting && connectOnStart {
+        // NE 未运行时，确保 On Demand 规则与用户设置一致
+        if vpn.isOnDemandEnabled != connectOnStart {
+            vpn.updateOnDemand(enabled: connectOnStart)
+        }
+        
+        // 如果开启了自动连接，手动触发一次（首次安装或 On Demand 尚未生效时）
+        if connectOnStart {
             let configs = ConfigManager.shared.refreshConfigs()
             if let config = configs.first {
                 print("[Launch] Triggering initial connect with: \(config.lastPathComponent)")

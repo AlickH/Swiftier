@@ -55,11 +55,14 @@ class VPNManager: ObservableObject {
                     // 状态已就绪后再标记 isReady，确保后续逻辑能读到正确的 isConnected
                     self.isReady = true
                     
-                    // 确保已有 Profile 的 On Demand 规则与用户设置一致
-                    self.applyOnDemandRules(to: existingManager)
-                    existingManager.saveToPreferences { error in
-                        if let error = error {
-                            print("VPNManager: Error updating On Demand rules: \(error)")
+                    // 仅在 On Demand 设置不一致时才 save，避免 saveToPreferences 导致系统重启隧道
+                    let connectOnStart = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
+                    if existingManager.isOnDemandEnabled != connectOnStart {
+                        self.applyOnDemandRules(to: existingManager)
+                        existingManager.saveToPreferences { error in
+                            if let error = error {
+                                print("VPNManager: Error updating On Demand rules: \(error)")
+                            }
                         }
                     }
                 }
