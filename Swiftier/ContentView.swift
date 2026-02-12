@@ -485,7 +485,7 @@ struct ContentView: View {
                 
                 Button {
                     if vpnManager.isConnected {
-                        vpnManager.stopVPN()
+                        vpnManager.disableOnDemandAndStop()
                     } else {
                         // 通过 ConfigManager 读取（处理安全域书签）
                         let configURL = URL(fileURLWithPath: selectedConfigPath)

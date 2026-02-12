@@ -101,8 +101,30 @@ class ConfigManager: ObservableObject {
     }
 
     func openiCloudFolder() {
-        guard let url = currentDirectory else { return }
-        NSWorkspace.shared.open(url)
+        var targetURL: URL?
+        
+        // 优先从书签恢复带权限的 URL
+        if let bookmark = customPathBookmark {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                _ = url.startAccessingSecurityScopedResource()
+                targetURL = url
+            }
+        }
+        
+        // Fallback: iCloud 容器路径
+        if targetURL == nil, let drive = iCloudDriveURL {
+            targetURL = drive.appendingPathComponent("Swiftier")
+        }
+        
+        // 最终 fallback
+        if targetURL == nil {
+            targetURL = currentDirectory
+        }
+        
+        guard let url = targetURL else { return }
+        // 使用 selectFile 在 Finder 中显示目录，避免沙盒权限问题
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
     }
 
     func editConfigFile(url: URL) {
