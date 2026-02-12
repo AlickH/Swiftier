@@ -41,7 +41,7 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Toggle("启动 APP 时自动连接", isOn: $connectOnStart)
+                    Toggle("Connect On Demand", isOn: $connectOnStart)
                         .onChange(of: connectOnStart) { newValue in
                             VPNManager.shared.updateOnDemand(enabled: newValue)
                         }
