@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import NetworkExtension
 
 @main
 struct SwiftierControlApp: App {
