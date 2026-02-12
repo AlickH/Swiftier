@@ -197,16 +197,34 @@ class VPNManager: ObservableObject {
         manager?.connection.stopVPNTunnel()
     }
     
-    /// 手动关闭：先禁用 On Demand 再断开，防止系统自动重连
+    /// 手动关闭：先 stop 隧道，等断开后再禁用 On Demand，防止系统自动重连
     func disableOnDemandAndStop() {
         guard let manager = manager else { return }
-        manager.isOnDemandEnabled = false
-        manager.saveToPreferences { [weak self] error in
-            if let error = error {
-                print("VPNManager: Error disabling On Demand: \(error)")
+        
+        // 先 stop
+        manager.connection.stopVPNTunnel()
+        
+        // 监听断开后立即禁用 On Demand
+        var observer: NSObjectProtocol?
+        observer = NotificationCenter.default.addObserver(
+            forName: .NEVPNStatusDidChange,
+            object: manager.connection,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, let mgr = self.manager else { return }
+            if mgr.connection.status == .disconnected {
+                if let obs = observer {
+                    NotificationCenter.default.removeObserver(obs)
+                }
+                mgr.isOnDemandEnabled = false
+                mgr.saveToPreferences { error in
+                    if let error = error {
+                        print("VPNManager: Error disabling On Demand after stop: \(error)")
+                    } else {
+                        print("VPNManager: On Demand disabled after manual stop")
+                    }
+                }
             }
-            // save 完成后再 stop，确保 On Demand 已关闭
-            self?.manager?.connection.stopVPNTunnel()
         }
     }
     
