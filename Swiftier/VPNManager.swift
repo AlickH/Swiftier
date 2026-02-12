@@ -38,9 +38,14 @@ class VPNManager: ObservableObject {
             }
             
             if let existingManager = managers?.first {
-                self.manager = existingManager
-                self.updateStatus()
-                self.isReady = true
+                // 必须在主线程同步设置所有 @Published 属性，避免竞态
+                DispatchQueue.main.async {
+                    self.manager = existingManager
+                    // 同步更新状态（不再二次派发）
+                    self.updateStatusSync()
+                    // 状态已就绪后再标记 isReady，确保 performAutoConnect 能读到正确的 isConnected
+                    self.isReady = true
+                }
             } else {
                 self.setupVPNProfile()
             }
@@ -164,37 +169,38 @@ class VPNManager: ObservableObject {
     }
     
     @objc private func vpnStatusDidChange(_ notification: Notification) {
-        updateStatus()
+        DispatchQueue.main.async {
+            self.updateStatusSync()
+        }
     }
     
-    private func updateStatus() {
+    /// 同步更新状态，必须在主线程调用
+    private func updateStatusSync() {
         guard let connection = manager?.connection else { return }
         
-        DispatchQueue.main.async {
-            self.status = connection.status
-            
-            switch connection.status {
-            case .connected:
-                self.isConnected = true
-                self.statusText = "已连接"
-            case .connecting:
-                self.isConnected = false
-                self.statusText = "连接中..."
-            case .disconnected:
-                self.isConnected = false
-                self.statusText = "未连接"
-            case .disconnecting:
-                self.isConnected = false
-                self.statusText = "断开中..."
-            case .invalid:
-                self.isConnected = false
-                self.statusText = "无效状态"
-            case .reasserting:
-                self.isConnected = false
-                self.statusText = "重连中..."
-            @unknown default:
-                self.statusText = "未知状态"
-            }
+        self.status = connection.status
+        
+        switch connection.status {
+        case .connected:
+            self.isConnected = true
+            self.statusText = "已连接"
+        case .connecting:
+            self.isConnected = false
+            self.statusText = "连接中..."
+        case .disconnected:
+            self.isConnected = false
+            self.statusText = "未连接"
+        case .disconnecting:
+            self.isConnected = false
+            self.statusText = "断开中..."
+        case .invalid:
+            self.isConnected = false
+            self.statusText = "无效状态"
+        case .reasserting:
+            self.isConnected = false
+            self.statusText = "重连中..."
+        @unknown default:
+            self.statusText = "未知状态"
         }
     }
 }

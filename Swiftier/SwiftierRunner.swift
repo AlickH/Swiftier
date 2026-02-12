@@ -149,14 +149,9 @@ final class SwiftierRunner: ObservableObject {
     }
 
     func syncWithVPNState() {
-        // Initial sync relies on VPNManager's current state
-        handleVPNStatusChange(VPNManager.shared.status)
-        
-        // If we are disconnected but configured to auto-connect on start
-        if VPNManager.shared.status == .disconnected && UserDefaults.standard.bool(forKey: "connectOnStart") {
-             // Let SwiftierControlApp handle the auto-connect logic or do it here if appropriate.
-             // Usually better to let the App entry point handle "on launch" actions.
-        }
+        let status = VPNManager.shared.status
+        print("[Runner] syncWithVPNState: status = \(status.rawValue)")
+        handleVPNStatusChange(status)
     }
     
     // MARK: - Control Actions

@@ -141,17 +141,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func performAutoConnect() {
-        let isConnected = VPNManager.shared.isConnected
+        let vpn = VPNManager.shared
+        let status = vpn.status
+        print("[AutoConnect] VPN status: \(status.rawValue), isConnected: \(vpn.isConnected)")
         
-        if isConnected {
-            print("VPN already connected, syncing state...")
+        if vpn.isConnected || status == .connected {
+            print("[AutoConnect] VPN already connected, syncing state...")
             SwiftierRunner.shared.syncWithVPNState()
+        } else if status == .connecting {
+            print("[AutoConnect] VPN is connecting, waiting...")
+            // 正在连接中，不需要重复操作，statusObserver 会处理
         } else {
             // 未运行，执行自动连接
             let configs = ConfigManager.shared.refreshConfigs()
+            print("[AutoConnect] Found \(configs.count) config(s)")
             if let config = configs.first {
-                print("Auto-connecting with config: \(config.lastPathComponent)")
+                print("[AutoConnect] Auto-connecting with config: \(config.lastPathComponent)")
                 SwiftierRunner.shared.toggleService(configPath: config.path)
+            } else {
+                print("[AutoConnect] No config files found, skipping auto-connect")
             }
         }
     }
