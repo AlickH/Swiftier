@@ -197,6 +197,19 @@ class VPNManager: ObservableObject {
         manager?.connection.stopVPNTunnel()
     }
     
+    /// 手动关闭：先禁用 On Demand 再断开，防止系统自动重连
+    func disableOnDemandAndStop() {
+        guard let manager = manager else { return }
+        manager.isOnDemandEnabled = false
+        manager.saveToPreferences { [weak self] error in
+            if let error = error {
+                print("VPNManager: Error disabling On Demand: \(error)")
+            }
+            // save 完成后再 stop，确保 On Demand 已关闭
+            self?.manager?.connection.stopVPNTunnel()
+        }
+    }
+    
     /// Send a message to the running NE provider and get a response
     func sendProviderMessage(_ message: String, completion: @escaping (Data?) -> Void) {
         guard let session = manager?.connection as? NETunnelProviderSession,

@@ -161,10 +161,16 @@ final class SwiftierRunner: ObservableObject {
         if isProcessing { return }
         
         if isRunning {
-            // Stop
-            VPNManager.shared.stopVPN()
+            // 手动关闭时先禁用 On Demand，否则系统会立刻重连
+            VPNManager.shared.disableOnDemandAndStop()
         } else {
             // Start
+            // 手动启动时恢复 On Demand（之前手动关闭时会禁用）
+            let connectOnStart = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
+            if connectOnStart {
+                VPNManager.shared.updateOnDemand(enabled: true)
+            }
+            
             // 使用 ConfigManager 读取（处理安全域）
             do {
                 let configURL = URL(fileURLWithPath: configPath)
