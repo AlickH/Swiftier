@@ -112,7 +112,7 @@ struct SettingsView: View {
                                     .font(.caption)
                                     .foregroundColor(Color(nsColor: .tertiaryLabelColor))
                             }
-                            Text("本项目遵循 MIT 开源许可证。")
+                            Text("本项目遵循 GPL-3.0 开源许可证。")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -185,33 +185,61 @@ struct SettingsView: View {
 struct LicenseView: View {
     @Binding var isPresented: Bool
     
-    private let mitLicense = """
-MIT License
+    private let gplLicense = """
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2007 Free Software Foundation, Inc.
+<https://fsf.org/>
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+Preamble
+
+The GNU General Public License is a free, copyleft license for software
+and other kinds of works.
+
+The licenses for most software and other practical works are designed to
+take away your freedom to share and change the works. By contrast, the
+GNU General Public License is intended to guarantee your freedom to share
+and change all versions of a program--to make sure it remains free software
+for all its users.
+
+When we speak of free software, we are referring to freedom, not price.
+Our General Public Licenses are designed to make sure that you have the
+freedom to distribute copies of free software (and charge for them if you
+wish), that you receive source code or can get it if you want it, that
+you can change the software or use pieces of it in new free programs, and
+that you know you can do these things.
+
+To protect your rights, we need to prevent others from denying you these
+rights or asking you to surrender the rights. Therefore, you have certain
+responsibilities if you distribute copies of the software, or if you
+modify it: responsibilities to respect the freedom of others.
+
+For the complete license text, visit:
+https://www.gnu.org/licenses/gpl-3.0.en.html
 
 Copyright (c) 2024 Alick Huang
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
     var body: some View {
         VStack(spacing: 0) {
-            UnifiedHeader(title: "MIT License") {
+            UnifiedHeader(title: "GPL-3.0 License") {
                 Button(LocalizedStringKey("关闭")) { 
                     withAnimation { isPresented = false }
                 }
@@ -219,7 +247,7 @@ SOFTWARE.
             } right: { EmptyView() }
             
             ScrollView {
-                Text(mitLicense)
+                Text(gplLicense)
                     .font(.system(.body, design: .monospaced))
                     .padding()
                     .textSelection(.enabled)

@@ -153,12 +153,6 @@
         }
       }
     },
-    "Swiftier %@" : {
-
-    },
-    "Swiftier %@ 可用" : {
-
-    },
     "Swiftier 已是最新版本" : {
       "extractionState" : "manual",
       "localizations" : {
