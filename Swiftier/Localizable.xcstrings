@@ -1301,17 +1301,7 @@
         }
       }
     },
-    "手动分配路由 CIDR，将禁用子网代理和从对等节点传播的 wireguard路由。例如：192.168.0.0/16" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Assign route CIDRs manually. This disables subnet proxying and Wireguard route propagation."
-          }
-        }
-      }
-    },
+
     "手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点。例如：tcp://123.123.123.123:11223，可以指定多个。" : {
       "extractionState" : "manual",
       "localizations" : {
