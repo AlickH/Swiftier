@@ -58,6 +58,20 @@ class ConfigManager: ObservableObject {
     }
 
     private init() {
+        // 修正：如果 customPathString 已指向 iCloud 容器，清除可能残留的旧书签
+        // （旧书签可能指向桌面等非 iCloud 路径，导致 currentDirectory 返回错误位置）
+        if let bookmark = customPathBookmark, !customPathString.isEmpty {
+            var isStale = false
+            if let bookmarkURL = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                let bookmarkPath = bookmarkURL.path
+                // 书签路径与当前设置路径不一致，说明书签是残留的旧数据
+                if bookmarkPath != customPathString {
+                    print("[ConfigManager] 清除残留书签: \(bookmarkPath) != \(customPathString)")
+                    self.customPathBookmark = nil
+                }
+            }
+        }
+        
         // 首次运行或未设置路径时，自动尝试初始化 iCloud
         if customPathString.isEmpty {
             if let drive = iCloudDriveURL {
