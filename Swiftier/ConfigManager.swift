@@ -183,12 +183,13 @@ class ConfigManager: ObservableObject {
                 }
             }
             
-            // 3. 切换目录并刷新
+            // 3. 切换目录并刷新（清除旧书签，iCloud 容器路径 App 自身有权限）
             DispatchQueue.main.async {
+                self.customPathBookmark = nil
                 self.customPathString = targetDir.path
                 self.refreshConfigs()
                 // 打开 Finder 确认
-                NSWorkspace.shared.open(targetDir)
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: targetDir.path)
             }
             
         } catch {
