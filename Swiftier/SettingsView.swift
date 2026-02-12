@@ -87,7 +87,7 @@ struct SettingsView: View {
                     }) {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("开源声明")
+                                Text(LocalizedStringKey("开源声明"))
                                     .font(.body)
                                     .foregroundColor(.primary)
                                 Spacer()
@@ -95,7 +95,7 @@ struct SettingsView: View {
                                     .font(.caption)
                                     .foregroundColor(Color(nsColor: .tertiaryLabelColor))
                             }
-                            Text("本项目遵循 GPL-3.0 开源许可证。")
+                            Text(LocalizedStringKey("本项目遵循 GPL-3.0 开源许可证。"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)

@@ -22,6 +22,17 @@
     "Alick Huang" : {
 
     },
+    "Connect On Demand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect On Demand"
+          }
+        }
+      }
+    },
     "DEBUG" : {
 
     },
@@ -400,7 +411,15 @@
       }
     },
     "仅使用物理网卡，避免 Swiftier 通过其他虚拟网建立连接。" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avoid virtual NICs."
+          }
+        }
+      }
     },
     "仅保留 Helper 加速启动" : {
       "extractionState" : "manual",
@@ -555,9 +574,6 @@
           }
         }
       }
-    },
-    "停止连接并退出" : {
-
     },
     "允许此节点成为出口节点。" : {
       "extractionState" : "manual",
@@ -714,7 +730,15 @@
       }
     },
     "加载失败: %@" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load failed: %@"
+          }
+        }
+      }
     },
     "协议" : {
       "extractionState" : "manual",
@@ -904,7 +928,15 @@
       }
     },
     "启用魔法 DNS，允许通过 Swiftier 的 DNS 服务器访问其他节点的虚拟 IPv4 地址，例如：node1.et.net。" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access by node name."
+          }
+        }
+      }
     },
     "在 Finder 中打开" : {
       "extractionState" : "manual",
@@ -940,7 +972,15 @@
       }
     },
     "在系统控制台中打开完整日志" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Full Logs in Console"
+          }
+        }
+      }
     },
     "地址" : {
       "extractionState" : "manual",
@@ -965,13 +1005,37 @@
       }
     },
     "如：tcp://1.1.1.1:11010" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g. tcp://1.1.1.1:11010"
+          }
+        }
+      }
     },
     "存储位置: iCloud Drive" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Storage: iCloud Drive"
+          }
+        }
+      }
     },
     "存储位置: 本地 (iCloud 未启用)" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Storage: Local (iCloud disabled)"
+          }
+        }
+      }
     },
     "存储到 iCloud" : {
       "extractionState" : "manual",
@@ -1161,7 +1225,15 @@
       }
     },
     "开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 Swiftier 网络。" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable SOCKS5 proxy so external apps like Surge can connect to the Swiftier network."
+          }
+        }
+      }
     },
     "开放" : {
       "extractionState" : "manual",
@@ -1219,7 +1291,15 @@
       }
     },
     "手动分配路由 CIDR，将禁用子网代理和从对等节点传播的 wireguard 路由。例如：192.168.0.0/16" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assign route CIDRs manually. This disables subnet proxying and Wireguard route propagation."
+          }
+        }
+      }
     },
     "手动分配路由 CIDR，将禁用子网代理和从对等节点传播的 wireguard路由。例如：192.168.0.0/16" : {
       "extractionState" : "manual",
@@ -1387,7 +1467,15 @@
       }
     },
     "本项目遵循 GPL-3.0 开源许可证。" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licensed under GPL-3.0."
+          }
+        }
+      }
     },
     "本项目遵循 MIT 开源许可证。" : {
       "extractionState" : "manual",
