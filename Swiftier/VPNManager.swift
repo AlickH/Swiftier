@@ -133,23 +133,31 @@ class VPNManager: ObservableObject {
     func updateOnDemand(enabled: Bool) {
         guard let manager = manager else { return }
         
-        if enabled {
-            let wifiRule = NEOnDemandRuleConnect()
-            wifiRule.interfaceTypeMatch = .wiFi
-            let ethernetRule = NEOnDemandRuleConnect()
-            ethernetRule.interfaceTypeMatch = .ethernet
-            manager.onDemandRules = [wifiRule, ethernetRule]
-            manager.isOnDemandEnabled = true
-        } else {
-            manager.onDemandRules = []
-            manager.isOnDemandEnabled = false
-        }
-        
-        manager.saveToPreferences { error in
+        manager.loadFromPreferences { [weak self] error in
+            guard let self = self, let mgr = self.manager else { return }
             if let error = error {
-                print("VPNManager: Error updating On Demand: \(error)")
+                print("VPNManager: Error loading preferences for On Demand update: \(error)")
+                return
+            }
+            
+            if enabled {
+                let wifiRule = NEOnDemandRuleConnect()
+                wifiRule.interfaceTypeMatch = .wiFi
+                let ethernetRule = NEOnDemandRuleConnect()
+                ethernetRule.interfaceTypeMatch = .ethernet
+                mgr.onDemandRules = [wifiRule, ethernetRule]
+                mgr.isOnDemandEnabled = true
             } else {
-                print("VPNManager: On Demand updated to \(enabled)")
+                mgr.onDemandRules = []
+                mgr.isOnDemandEnabled = false
+            }
+            
+            mgr.saveToPreferences { error in
+                if let error = error {
+                    print("VPNManager: Error updating On Demand: \(error)")
+                } else {
+                    print("VPNManager: On Demand updated to \(enabled)")
+                }
             }
         }
     }
@@ -197,33 +205,29 @@ class VPNManager: ObservableObject {
         manager?.connection.stopVPNTunnel()
     }
     
-    /// 手动关闭：先 stop 隧道，等断开后再禁用 On Demand，防止系统自动重连
+    /// 手动关闭：load → 禁用 On Demand → save → stop，防止系统自动重连
     func disableOnDemandAndStop() {
         guard let manager = manager else { return }
         
-        // 先 stop
-        manager.connection.stopVPNTunnel()
-        
-        // 监听断开后立即禁用 On Demand
-        var observer: NSObjectProtocol?
-        observer = NotificationCenter.default.addObserver(
-            forName: .NEVPNStatusDidChange,
-            object: manager.connection,
-            queue: .main
-        ) { [weak self] _ in
+        // Apple 要求 save 前先 load 最新状态
+        manager.loadFromPreferences { [weak self] error in
             guard let self = self, let mgr = self.manager else { return }
-            if mgr.connection.status == .disconnected {
-                if let obs = observer {
-                    NotificationCenter.default.removeObserver(obs)
+            if let error = error {
+                print("VPNManager: Error loading preferences: \(error)")
+                // 即使 load 失败也尝试 stop
+                mgr.connection.stopVPNTunnel()
+                return
+            }
+            
+            mgr.isOnDemandEnabled = false
+            mgr.saveToPreferences { error in
+                if let error = error {
+                    print("VPNManager: Error disabling On Demand: \(error)")
+                } else {
+                    print("VPNManager: On Demand disabled, now stopping tunnel")
                 }
-                mgr.isOnDemandEnabled = false
-                mgr.saveToPreferences { error in
-                    if let error = error {
-                        print("VPNManager: Error disabling On Demand after stop: \(error)")
-                    } else {
-                        print("VPNManager: On Demand disabled after manual stop")
-                    }
-                }
+                // save 完成后再 stop
+                mgr.connection.stopVPNTunnel()
             }
         }
     }
