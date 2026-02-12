@@ -7,18 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E0AB5CCB2F3CCD9C00BD8CBA /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AB5CCA2F3CCD9C00BD8CBA /* NetworkExtension.framework */; };
-		E0AB5CD32F3CCD9C00BD8CBA /* SwiftierNE.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E025243B2F1BDA8500F5065A /* SwiftierHelper in Copy Helper Executable */ = {isa = PBXBuildFile; fileRef = E0AC7EE12F192DD600FC425C /* SwiftierHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		E0AC7EEE2F19307C00FC425C /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		E0AB5CD12F3CCD9C00BD8CBA /* PBXContainerItemProxy */ = {
+		E0AC7EF52F1933C600FC425C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E0933DC42F16A25B00C7DE59 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = E0AB5CC82F3CCD9C00BD8CBA;
-			remoteInfo = SwiftierNE;
+			remoteGlobalIDString = E0AC7EE02F192DD600FC425C;
+			remoteInfo = EasyTierHelper;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -29,19 +28,9 @@
 			dstPath = "";
 			dstSubfolderSpec = 6;
 			files = (
+				E025243B2F1BDA8500F5065A /* SwiftierHelper in Copy Helper Executable */,
 			);
 			name = "Copy Helper Executable";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E0AB5CD82F3CCD9C00BD8CBA /* Embed Foundation Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				E0AB5CD32F3CCD9C00BD8CBA /* SwiftierNE.appex in Embed Foundation Extensions */,
-			);
-			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		E0AC7ED12F19208200FC425C /* CopyFiles */ = {
@@ -53,23 +42,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E0AC7EDF2F192DD600FC425C /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		E0933DCC2F16A25B00C7DE59 /* Swiftier.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swiftier.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwiftierNE.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		E0AB5CCA2F3CCD9C00BD8CBA /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		E0AC7EE12F192DD600FC425C /* SwiftierHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SwiftierHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		E0AB5CD72F3CCD9C00BD8CBA /* Exceptions for "SwiftierNE" folder in "SwiftierNE" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */;
-		};
 		E0DA09B32F17A75300C54228 /* Exceptions for "Swiftier" folder in "Swiftier" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -79,21 +69,32 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		E025243D2F1BDABB00F5065A /* Exceptions for "Swiftier" folder in "Copy Files" phase from "Swiftier" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				com.alick.swiftier.helper.plist = (CodeSignOnCopy, );
+			};
+			buildPhase = E0AC7ED12F19208200FC425C /* CopyFiles */;
+			membershipExceptions = (
+				com.alick.swiftier.helper.plist,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E0933DCE2F16A25B00C7DE59 /* Swiftier */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				E0DA09B32F17A75300C54228 /* Exceptions for "Swiftier" folder in "Swiftier" target */,
+				E025243D2F1BDABB00F5065A /* Exceptions for "Swiftier" folder in "Copy Files" phase from "Swiftier" target */,
 			);
 			path = Swiftier;
 			sourceTree = "<group>";
 		};
-		E0AB5CCC2F3CCD9C00BD8CBA /* SwiftierNE */ = {
+		E0AC7EA42F18E97F00FC425C /* SwiftierHelper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				E0AB5CD72F3CCD9C00BD8CBA /* Exceptions for "SwiftierNE" folder in "SwiftierNE" target */,
-			);
-			path = SwiftierNE;
+			path = SwiftierHelper;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -107,11 +108,10 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E0AB5CC62F3CCD9C00BD8CBA /* Frameworks */ = {
+		E0AC7EDE2F192DD600FC425C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E0AB5CCB2F3CCD9C00BD8CBA /* NetworkExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -122,7 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				E0933DCE2F16A25B00C7DE59 /* Swiftier */,
-				E0AB5CCC2F3CCD9C00BD8CBA /* SwiftierNE */,
+				E0AC7EA42F18E97F00FC425C /* SwiftierHelper */,
 				E0AC7EEC2F19307C00FC425C /* Frameworks */,
 				E0933DCD2F16A25B00C7DE59 /* Products */,
 			);
@@ -132,7 +132,7 @@
 			isa = PBXGroup;
 			children = (
 				E0933DCC2F16A25B00C7DE59 /* Swiftier.app */,
-				E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */,
+				E0AC7EE12F192DD600FC425C /* SwiftierHelper */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,7 +141,6 @@
 			isa = PBXGroup;
 			children = (
 				E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */,
-				E0AB5CCA2F3CCD9C00BD8CBA /* NetworkExtension.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -158,12 +157,11 @@
 				E0933DCA2F16A25B00C7DE59 /* Resources */,
 				E0933E002F16A42100C7DE59 /* Copy Helper Executable */,
 				E0AC7ED12F19208200FC425C /* CopyFiles */,
-				E0AB5CD82F3CCD9C00BD8CBA /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				E0AB5CD22F3CCD9C00BD8CBA /* PBXTargetDependency */,
+				E0AC7EF62F1933C600FC425C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E0933DCE2F16A25B00C7DE59 /* Swiftier */,
@@ -171,31 +169,28 @@
 			name = Swiftier;
 			packageProductDependencies = (
 			);
-			productName = Swiftier;
+			productName = EasyTier;
 			productReference = E0933DCC2F16A25B00C7DE59 /* Swiftier.app */;
 			productType = "com.apple.product-type.application";
 		};
-		E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */ = {
+		E0AC7EE02F192DD600FC425C /* SwiftierHelper */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E0AB5CD42F3CCD9C00BD8CBA /* Build configuration list for PBXNativeTarget "SwiftierNE" */;
+			buildConfigurationList = E0AC7EE52F192DD600FC425C /* Build configuration list for PBXNativeTarget "SwiftierHelper" */;
 			buildPhases = (
-				E0AB5CC52F3CCD9C00BD8CBA /* Sources */,
-				E0AB5CC62F3CCD9C00BD8CBA /* Frameworks */,
-				E0AB5CC72F3CCD9C00BD8CBA /* Resources */,
+				E0AC7EDD2F192DD600FC425C /* Sources */,
+				E0AC7EDE2F192DD600FC425C /* Frameworks */,
+				E0AC7EDF2F192DD600FC425C /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				E0AB5CCC2F3CCD9C00BD8CBA /* SwiftierNE */,
-			);
-			name = SwiftierNE;
+			name = SwiftierHelper;
 			packageProductDependencies = (
 			);
-			productName = SwiftierNE;
-			productReference = E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */;
-			productType = "com.apple.product-type.app-extension";
+			productName = EasyTierHelper;
+			productReference = E0AC7EE12F192DD600FC425C /* SwiftierHelper */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -204,36 +199,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					E0933DCB2F16A25B00C7DE59 = {
 						CreatedOnToolsVersion = 26.2;
-						SystemCapabilities = {
-							com.apple.ApplicationGroups.iOS = {
-								enabled = 1;
-							};
-							com.apple.NetworkExtensions = {
-								enabled = 1;
-							};
-							com.apple.Sandbox = {
-								enabled = 1;
-							};
-						};
 					};
-					E0AB5CC82F3CCD9C00BD8CBA = {
-						CreatedOnToolsVersion = 26.3;
-						SystemCapabilities = {
-							com.apple.ApplicationGroups.iOS = {
-								enabled = 1;
-							};
-							com.apple.NetworkExtensions = {
-								enabled = 1;
-							};
-							com.apple.Sandbox = {
-								enabled = 1;
-							};
-						};
+					E0AC7EE02F192DD600FC425C = {
+						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
@@ -252,20 +225,13 @@
 			projectRoot = "";
 			targets = (
 				E0933DCB2F16A25B00C7DE59 /* Swiftier */,
-				E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */,
+				E0AC7EE02F192DD600FC425C /* SwiftierHelper */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		E0933DCA2F16A25B00C7DE59 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E0AB5CC72F3CCD9C00BD8CBA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -282,7 +248,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E0AB5CC52F3CCD9C00BD8CBA /* Sources */ = {
+		E0AC7EDD2F192DD600FC425C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -292,10 +258,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		E0AB5CD22F3CCD9C00BD8CBA /* PBXTargetDependency */ = {
+		E0AC7EF62F1933C600FC425C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */;
-			targetProxy = E0AB5CD12F3CCD9C00BD8CBA /* PBXContainerItemProxy */;
+			target = E0AC7EE02F192DD600FC425C /* SwiftierHelper */;
+			targetProxy = E0AC7EF52F1933C600FC425C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -429,36 +395,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = Swiftier;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Swiftier/Swiftier.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				AUTOMATION_APPLE_EVENTS = YES;
+				CODE_SIGN_ENTITLEMENTS = EasyTier/EasyTier.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Swiftier/Info.plist;
+				INFOPLIST_FILE = EasyTier/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Swiftier;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -469,15 +425,14 @@
 				);
 				LIBRARY_SEARCH_PATHS = "";
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.9.10;
 				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
-				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
-				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = YES;
 				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
@@ -495,36 +450,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = Swiftier;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Swiftier/Swiftier.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				AUTOMATION_APPLE_EVENTS = YES;
+				CODE_SIGN_ENTITLEMENTS = EasyTier/EasyTier.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Swiftier/Info.plist;
+				INFOPLIST_FILE = EasyTier/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Swiftier;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -535,15 +480,14 @@
 				);
 				LIBRARY_SEARCH_PATHS = "";
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.9.10;
 				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
-				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
-				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = YES;
 				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
@@ -556,44 +500,25 @@
 			};
 			name = Release;
 		};
-		E0AB5CD52F3CCD9C00BD8CBA /* Debug */ = {
+		E0AC7EE62F192DD600FC425C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = SwiftierNE/SwiftierNE.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				AUTOMATION_APPLE_EVENTS = YES;
+				CODE_SIGN_ENTITLEMENTS = EasyTierHelper/EasyTierHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
+				ENABLE_CODE_COVERAGE = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readwrite;
-				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/include/**";
-				INFOPLIST_FILE = SwiftierNE/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SwiftierNE;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@executable_path/../../../../Frameworks",
-				);
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				INFOPLIST_FILE = EasyTierHelper/Info.plist;
 				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/target/release";
-				MARKETING_VERSION = 1.0.0;
-				"OBJC_BRIDGING_HEADER[sdk=macosx*]" = "SwiftierNE/SwiftierNE-Bridging-Header.h";
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				OTHER_LDFLAGS = (
 					"-leasytier_ios",
 					"-lc++",
@@ -605,57 +530,40 @@
 					"-framework",
 					CoreFoundation,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.SwiftierNE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.helper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = YES;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "SwiftierNE/SwiftierNE-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		E0AB5CD62F3CCD9C00BD8CBA /* Release */ = {
+		E0AC7EE72F192DD600FC425C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = SwiftierNE/SwiftierNE.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				AUTOMATION_APPLE_EVENTS = YES;
+				CODE_SIGN_ENTITLEMENTS = EasyTierHelper/EasyTierHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
-				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
+				ENABLE_CODE_COVERAGE = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readwrite;
-				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/include/**";
-				INFOPLIST_FILE = SwiftierNE/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SwiftierNE;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@executable_path/../../../../Frameworks",
-				);
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				INFOPLIST_FILE = EasyTierHelper/Info.plist;
 				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/target/release";
-				MARKETING_VERSION = 1.0.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				OTHER_LDFLAGS = (
 					"-leasytier_ios",
 					"-lc++",
@@ -667,15 +575,16 @@
 					"-framework",
 					CoreFoundation,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.SwiftierNE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.helper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = YES;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "SwiftierNE/SwiftierNE-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -702,11 +611,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E0AB5CD42F3CCD9C00BD8CBA /* Build configuration list for PBXNativeTarget "SwiftierNE" */ = {
+		E0AC7EE52F192DD600FC425C /* Build configuration list for PBXNativeTarget "SwiftierHelper" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E0AB5CD52F3CCD9C00BD8CBA /* Debug */,
-				E0AB5CD62F3CCD9C00BD8CBA /* Release */,
+				E0AC7EE62F192DD600FC425C /* Debug */,
+				E0AC7EE72F192DD600FC425C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

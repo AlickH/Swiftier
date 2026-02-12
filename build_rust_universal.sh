@@ -21,6 +21,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 # Set deployment target to avoid linker warnings (built for newer macOS)
 export MACOSX_DEPLOYMENT_TARGET=13.0
 
+
 echo "🚀 Starting Universal Rust Build..."
 echo "Using cargo: $(which cargo)"
 
