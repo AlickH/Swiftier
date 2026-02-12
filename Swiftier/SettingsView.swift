@@ -83,14 +83,6 @@ struct SettingsView: View {
                     }
                     
                     HStack {
-                        Text("联系邮箱")
-                        Spacer()
-                        Text("minamike2007@gmail.com")
-                            .foregroundColor(.secondary)
-                            .textSelection(.enabled)
-                    }
-                    
-                    HStack {
                         Text("源代码")
                         Spacer()
                         Link("GitHub 仓库", destination: URL(string: "https://github.com/AlickH/Swiftier")!)

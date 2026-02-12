@@ -86,6 +86,9 @@
         }
       }
     },
+    "GPL-3.0 License" : {
+
+    },
     "INFO" : {
 
     },
@@ -101,9 +104,6 @@
       }
     },
     "minamike2007@gmail.com" : {
-
-    },
-    "MIT License" : {
 
     },
     "MTU" : {
@@ -1388,6 +1388,9 @@
           }
         }
       }
+    },
+    "本项目遵循 GPL-3.0 开源许可证。" : {
+
     },
     "本项目遵循 MIT 开源许可证。" : {
       "extractionState" : "manual",
