@@ -308,23 +308,9 @@ struct ContentView: View {
                 
                 // 退出按钮
                 Button(action: {
-                    // 退出逻辑：根据 exitBehavior 设置决定行为
-                    // 现在的 Network Extension 行为有所不同：
-                    // keepRunning: 只是退出 UI，VPN 保持连接 (NetworkExtension 默认行为)
-                    // stopCore/stopAll: 都是停止 VPN
-                    
-                    let behavior = UserDefaults.standard.string(forKey: "exitBehavior") ?? "stopVPN"
-                    
-                    if behavior == "keepRunning" {
-                         NSApplication.shared.terminate(nil)
-                    } else {
-                        // 默认为停止 VPN
-                        VPNManager.shared.stopVPN()
-                        // 稍微延迟一下给 NE 发送停止信号
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            NSApplication.shared.terminate(nil)
-                        }
-                    }
+                    // Connect On Demand 模式：退出 App 不影响 VPN
+                    // VPN 由系统管理，App 只是 UI 控制面板
+                    NSApplication.shared.terminate(nil)
                 }) {
                     Image(systemName: "power")
                         .font(.system(size: 14)) // 恢复默认粗细

@@ -7,7 +7,7 @@ struct SettingsView: View {
     @AppStorage("connectOnStart") private var connectOnStart: Bool = true
     @AppStorage("breathEffect") private var breathEffect: Bool = true
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
-    @AppStorage("exitBehavior") private var exitBehavior: String = "stopVPN" // keepRunning, stopVPN
+
     @AppStorage("logLevel", store: UserDefaults(suiteName: "group.com.alick.swiftier")) private var logLevel: String = "INFO"
     
     
@@ -42,6 +42,9 @@ struct SettingsView: View {
                     }
                     
                     Toggle("启动 APP 时自动连接", isOn: $connectOnStart)
+                        .onChange(of: connectOnStart) { newValue in
+                            VPNManager.shared.updateOnDemand(enabled: newValue)
+                        }
                     Toggle("连接时图标呼吸闪烁", isOn: $breathEffect)
                     
                     // 开机自启
@@ -49,18 +52,6 @@ struct SettingsView: View {
                         .onChange(of: launchAtLogin) { newValue in
                             toggleLaunchAtLogin(enabled: newValue)
                         }
-                    
-                    HStack {
-                        Text(LocalizedStringKey("退出 APP 时"))
-                        Spacer()
-                        Picker("", selection: $exitBehavior) {
-                            Text(LocalizedStringKey("保持连接运行")).tag("keepRunning")
-                            Text(LocalizedStringKey("停止连接并退出")).tag("stopVPN")
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
                 }
                 
                 
@@ -142,16 +133,7 @@ struct SettingsView: View {
         }
     }
     
-    private var exitBehaviorDescription: String {
-        switch exitBehavior {
-        case "keepRunning":
-            return "退出 APP 后，VPN 连接将保持运行。"
-        case "stopVPN":
-            return "退出 APP 后，断开 VPN 连接。"
-        default:
-            return ""
-        }
-    }
+
     
 
 

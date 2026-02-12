@@ -10,6 +10,10 @@ class VPNManager: ObservableObject {
     @Published var status: NEVPNStatus = .disconnected
     @Published var isReady = false
     
+    var isOnDemandEnabled: Bool {
+        manager?.isOnDemandEnabled ?? false
+    }
+    
     private var manager: NETunnelProviderManager?
     
     init() {
@@ -43,8 +47,16 @@ class VPNManager: ObservableObject {
                     self.manager = existingManager
                     // 同步更新状态（不再二次派发）
                     self.updateStatusSync()
-                    // 状态已就绪后再标记 isReady，确保 performAutoConnect 能读到正确的 isConnected
+                    // 状态已就绪后再标记 isReady，确保后续逻辑能读到正确的 isConnected
                     self.isReady = true
+                    
+                    // 确保已有 Profile 的 On Demand 规则与用户设置一致
+                    self.applyOnDemandRules(to: existingManager)
+                    existingManager.saveToPreferences { error in
+                        if let error = error {
+                            print("VPNManager: Error updating On Demand rules: \(error)")
+                        }
+                    }
                 }
             } else {
                 self.setupVPNProfile()
@@ -54,44 +66,82 @@ class VPNManager: ObservableObject {
     
     private func setupVPNProfile() {
         print("VPNManager: Starting setupVPNProfile...")
-        print("VPNManager: Current Bundle ID: \(Bundle.main.bundleIdentifier ?? "Unknown")")
         
         let manager = NETunnelProviderManager()
         manager.localizedDescription = "Swiftier VPN"
         
         let protocolConfiguration = NETunnelProviderProtocol()
-        // 关键点：这个 ID 必须和 Extension 的 Bundle ID 完全一致
         let extensionBundleID = "com.alick.swiftier.SwiftierNE"
         protocolConfiguration.providerBundleIdentifier = extensionBundleID
         protocolConfiguration.serverAddress = "Swiftier"
         
-        print("VPNManager: Setting providerBundleIdentifier to: \(extensionBundleID)")
-        
         manager.protocolConfiguration = protocolConfiguration
         manager.isEnabled = true
         
+        // Connect On Demand: 网络可用时系统自动启动 NE
+        applyOnDemandRules(to: manager)
+        
         manager.saveToPreferences { [weak self] error in
             if let error = error {
-                print("VPNManager: Critical Error saving VPN profile!")
-                print("VPNManager: Error Domain: \((error as NSError).domain)")
-                print("VPNManager: Error Code: \((error as NSError).code)")
-                print("VPNManager: Description: \(error.localizedDescription)")
-                print("VPNManager: UserInfo: \((error as NSError).userInfo)")
+                print("VPNManager: Error saving VPN profile: \(error.localizedDescription)")
             } else {
                 print("VPNManager: VPN Profile saved successfully.")
-                self?.manager = manager
-                self?.isReady = true
-                
-                // Save again for good measure (sometimes required to persist fully)
+                // 二次保存确保持久化
                 manager.saveToPreferences { error in
                     if let error = error {
-                         print("VPNManager: Error on second save: \(error)")
+                        print("VPNManager: Error on second save: \(error)")
                     } else {
-                         print("VPNManager: Second save successful.")
+                        print("VPNManager: Second save successful.")
                     }
                 }
-                
-                self?.loadPreferences() // Reload to be sure
+                self?.loadPreferences()
+            }
+        }
+    }
+    
+    /// 配置 Connect On Demand 规则
+    private func applyOnDemandRules(to manager: NETunnelProviderManager) {
+        let connectOnStart = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
+        
+        if connectOnStart {
+            // 任何网络可用时自动连接
+            let wifiRule = NEOnDemandRuleConnect()
+            wifiRule.interfaceTypeMatch = .wiFi
+            
+            let ethernetRule = NEOnDemandRuleConnect()
+            ethernetRule.interfaceTypeMatch = .ethernet
+            
+            manager.onDemandRules = [wifiRule, ethernetRule]
+            manager.isOnDemandEnabled = true
+            print("VPNManager: Connect On Demand enabled")
+        } else {
+            manager.onDemandRules = []
+            manager.isOnDemandEnabled = false
+            print("VPNManager: Connect On Demand disabled")
+        }
+    }
+    
+    /// 外部调用：更新 On Demand 设置（设置页切换时调用）
+    func updateOnDemand(enabled: Bool) {
+        guard let manager = manager else { return }
+        
+        if enabled {
+            let wifiRule = NEOnDemandRuleConnect()
+            wifiRule.interfaceTypeMatch = .wiFi
+            let ethernetRule = NEOnDemandRuleConnect()
+            ethernetRule.interfaceTypeMatch = .ethernet
+            manager.onDemandRules = [wifiRule, ethernetRule]
+            manager.isOnDemandEnabled = true
+        } else {
+            manager.onDemandRules = []
+            manager.isOnDemandEnabled = false
+        }
+        
+        manager.saveToPreferences { error in
+            if let error = error {
+                print("VPNManager: Error updating On Demand: \(error)")
+            } else {
+                print("VPNManager: On Demand updated to \(enabled)")
             }
         }
     }

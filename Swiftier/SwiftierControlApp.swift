@@ -110,56 +110,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         
-        // 自动连接
-        checkAndAutoConnect()
+        // 等待 VPNManager 加载完成后同步状态
+        // Connect On Demand 由系统管理自动连接，App 只需同步 UI 状态
+        waitForVPNReady()
     }
     
     // MARK: - Lifecycle
     
     func applicationWillTerminate(_ notification: Notification) {
-        // 退出行为由 ContentView 的退出按钮处理
-        // 这里只处理意外关闭的情况
+        // NE 由系统通过 Connect On Demand 管理，App 退出不影响 VPN 连接
     }
     
-    // MARK: - Auto Connect
+    // MARK: - VPN State Sync
     
-    private func checkAndAutoConnect() {
-        // Default true, key match SettingsView
-        let autoConnect = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
-        guard autoConnect else { return }
-        
-        // 等待 VPNManager 完成 Profile 加载/创建后再自动连接
-        // 使用 Combine 监听 isReady 状态，避免固定延时导致的竞态
+    private func waitForVPNReady() {
         VPNManager.shared.$isReady
-            .filter { $0 } // 等待 isReady == true
-            .first()       // 只触发一次
+            .filter { $0 }
+            .first()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.performAutoConnect()
+                self?.syncStateOnLaunch()
             }
             .store(in: &cancellables)
     }
     
-    private func performAutoConnect() {
+    private func syncStateOnLaunch() {
         let vpn = VPNManager.shared
-        let status = vpn.status
-        print("[AutoConnect] VPN status: \(status.rawValue), isConnected: \(vpn.isConnected)")
+        print("[Launch] VPN status: \(vpn.status.rawValue), isConnected: \(vpn.isConnected), onDemand: \(vpn.isOnDemandEnabled)")
         
-        if vpn.isConnected || status == .connected {
-            print("[AutoConnect] VPN already connected, syncing state...")
-            SwiftierRunner.shared.syncWithVPNState()
-        } else if status == .connecting {
-            print("[AutoConnect] VPN is connecting, waiting...")
-            // 正在连接中，不需要重复操作，statusObserver 会处理
-        } else {
-            // 未运行，执行自动连接
+        // 同步 Runner 的 UI 状态
+        SwiftierRunner.shared.syncWithVPNState()
+        
+        // 确保 On Demand 规则与用户设置一致
+        let connectOnStart = (UserDefaults.standard.object(forKey: "connectOnStart") as? Bool) ?? true
+        vpn.updateOnDemand(enabled: connectOnStart)
+        
+        // 如果 NE 未运行且开启了自动连接，手动触发一次（首次安装或 On Demand 尚未生效时）
+        if !vpn.isConnected && vpn.status != .connecting && connectOnStart {
             let configs = ConfigManager.shared.refreshConfigs()
-            print("[AutoConnect] Found \(configs.count) config(s)")
             if let config = configs.first {
-                print("[AutoConnect] Auto-connecting with config: \(config.lastPathComponent)")
+                print("[Launch] Triggering initial connect with: \(config.lastPathComponent)")
                 SwiftierRunner.shared.toggleService(configPath: config.path)
-            } else {
-                print("[AutoConnect] No config files found, skipping auto-connect")
             }
         }
     }
