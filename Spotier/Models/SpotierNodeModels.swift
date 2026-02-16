@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Core Status Models (Ported from Swiftier-iOS)
 
-struct SwiftierStatus: Codable {
+struct SpotierStatus: Codable {
     enum NATType: Int, Codable, Hashable {
         case unknown = 0
         case openInternet = 1

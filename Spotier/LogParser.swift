@@ -13,7 +13,7 @@ class LogParser: ObservableObject {
     // Persistence
     private var eventsFileURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("Swiftier")
+        let dir = appSupport.appendingPathComponent("Spotier")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("events.json")
     }

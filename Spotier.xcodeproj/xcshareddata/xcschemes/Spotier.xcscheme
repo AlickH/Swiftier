@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E0933DCB2F16A25B00C7DE59"
-               BuildableName = "Swiftier.app"
-               BlueprintName = "Swiftier"
-               ReferencedContainer = "container:Swiftier.xcodeproj">
+               BuildableName = "Spotier.app"
+               BlueprintName = "Spotier"
+               ReferencedContainer = "container:Spotier.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -36,9 +36,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E0933DD82F16A26200C7DE59"
-               BuildableName = "SwiftierTests.xctest"
-               BlueprintName = "SwiftierTests"
-               ReferencedContainer = "container:Swiftier.xcodeproj">
+               BuildableName = "SpotierTests.xctest"
+               BlueprintName = "SpotierTests"
+               ReferencedContainer = "container:Spotier.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -47,9 +47,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E0933DE22F16A26200C7DE59"
-               BuildableName = "SwiftierUITests.xctest"
-               BlueprintName = "SwiftierUITests"
-               ReferencedContainer = "container:Swiftier.xcodeproj">
+               BuildableName = "SpotierUITests.xctest"
+               BlueprintName = "SpotierUITests"
+               ReferencedContainer = "container:Spotier.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E0933DCB2F16A25B00C7DE59"
-            BuildableName = "Swiftier.app"
-            BlueprintName = "Swiftier"
-            ReferencedContainer = "container:Swiftier.xcodeproj">
+            BuildableName = "Spotier.app"
+            BlueprintName = "Spotier"
+            ReferencedContainer = "container:Spotier.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -86,9 +86,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E0933DCB2F16A25B00C7DE59"
-            BuildableName = "Swiftier.app"
-            BlueprintName = "Swiftier"
-            ReferencedContainer = "container:Swiftier.xcodeproj">
+            BuildableName = "Spotier.app"
+            BlueprintName = "Spotier"
+            ReferencedContainer = "container:Spotier.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

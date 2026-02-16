@@ -6,7 +6,7 @@ struct ContentView: View {
     
     // 性能优化：不再直接观察整个 runner，避免 uptime/speed 变化触发全量 Diff
     // 改为手动监听核心状态
-    private var runner = SwiftierRunner.shared
+    private var runner = SpotierRunner.shared
     @ObservedObject private var vpnManager = VPNManager.shared
     @State private var isRunning = false
     @State private var isWindowVisible = true
@@ -461,7 +461,7 @@ struct ContentView: View {
         let isPaused: Bool // 新增：是否暂停
         
         // 直接订阅 runner，只有这个组件会被频繁刷新
-        @ObservedObject private var runner = SwiftierRunner.shared
+        @ObservedObject private var runner = SpotierRunner.shared
         @ObservedObject private var vpnManager = VPNManager.shared
         
         var body: some View {
@@ -528,7 +528,7 @@ struct ContentView: View {
     
     // MARK: - 节点列表区域（独立组件，隔离 peers 刷新）
     struct PeerListArea: View {
-        @StateObject private var runner = SwiftierRunner.shared
+        @StateObject private var runner = SpotierRunner.shared
         
         // 定义两行网格布局，自适应宽度
         private let gridRows = [

@@ -78,7 +78,7 @@ struct CodeEditor: NSViewRepresentable {
             applyStyle(pattern: "(?i)TRACE", color: NSColor.systemBlue, bold: true)
             
             // Highlight Swiftier keywords
-            applyStyle(pattern: "Swiftier", color: NSColor.labelColor, bold: true)
+            applyStyle(pattern: "Spotier", color: NSColor.labelColor, bold: true)
         } else if mode == .json {
             // JSON Syntax Highlighting
             storage.removeAttribute(.foregroundColor, range: fullRange)

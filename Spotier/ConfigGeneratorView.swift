@@ -12,7 +12,7 @@ struct PortForwardRule: Identifiable, Equatable {
     var targetPort: String = ""
 }
 
-struct SwiftierConfigModel: Equatable {
+struct SpotierConfigModel: Equatable {
     var instanceName: String = Host.current().localizedName ?? "swiftier-node"
     var instanceId: String = UUID().uuidString.lowercased()
     
@@ -107,7 +107,7 @@ struct SwiftierConfigModel: Equatable {
     var onlyP2P: Bool = false
 }
     
-extension SwiftierConfigModel {
+extension SpotierConfigModel {
     var vpnPortalIpBinding: String {
         get {
             let parts = vpnPortalClientCidr.split(separator: "/")
@@ -147,13 +147,13 @@ class ConfigDraftManager {
     
     // Support multiple drafts for different files
     // Key nil represents "New Config" draft
-    private var drafts: [URL?: SwiftierConfigModel] = [:]
+    private var drafts: [URL?: SpotierConfigModel] = [:]
 
-    func getDraft(for url: URL?) -> SwiftierConfigModel? {
+    func getDraft(for url: URL?) -> SpotierConfigModel? {
         return drafts[url]
     }
     
-    func saveDraft(for url: URL?, model: SwiftierConfigModel) {
+    func saveDraft(for url: URL?, model: SpotierConfigModel) {
         drafts[url] = model
     }
     
@@ -190,7 +190,7 @@ struct ConfigGeneratorView: View {
     var editingFileURL: URL? = nil // 支持传入文件进行编辑
     var onSave: () -> Void
     
-    @State private var model = SwiftierConfigModel()
+    @State private var model = SpotierConfigModel()
     
     // Track if we've already loaded to avoid resetting user edits
     @State private var hasLoadedInitially = false
@@ -275,7 +275,7 @@ struct ConfigGeneratorView: View {
         if editingFileURL != lastLoadedURL {
             if editingFileURL == nil {
                  // New file without draft -> Reset
-                 model = SwiftierConfigModel()
+                 model = SpotierConfigModel()
             } else {
                 loadFromFile()
             }
@@ -412,7 +412,7 @@ struct ConfigGeneratorView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Button { model.proxySubnets.append(SwiftierConfigModel.ProxySubnet(cidr: "0.0.0.0/0")) } label: {
+                    Button { model.proxySubnets.append(SpotierConfigModel.ProxySubnet(cidr: "0.0.0.0/0")) } label: {
                         HStack {
                             Image(systemName: "plus.circle.fill")
                             Text("添加代理网段")
@@ -994,8 +994,8 @@ struct ConfigGeneratorView: View {
         self.model = parseTOML(content)
     }
     
-    private func parseTOML(_ content: String) -> SwiftierConfigModel {
-        var m = SwiftierConfigModel()
+    private func parseTOML(_ content: String) -> SpotierConfigModel {
+        var m = SpotierConfigModel()
         let lines = content.components(separatedBy: .newlines)
         var currentSection = ""
         
@@ -1011,7 +1011,7 @@ struct ConfigGeneratorView: View {
             if trimmed.hasPrefix("[") {
                 if trimmed.hasPrefix("[[") {
                     currentSection = String(trimmed.dropFirst(2).dropLast(2))
-                    if currentSection == "proxy_network" { m.proxySubnets.append(SwiftierConfigModel.ProxySubnet()) }
+                    if currentSection == "proxy_network" { m.proxySubnets.append(SpotierConfigModel.ProxySubnet()) }
                     if currentSection == "port_forward" { m.portForwards.append(PortForwardRule()) }
                 } else {
                     currentSection = String(trimmed.dropFirst(1).dropLast(1))

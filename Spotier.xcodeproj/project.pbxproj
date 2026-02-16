@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		E0AB5CCB2F3CCD9C00BD8CBA /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AB5CCA2F3CCD9C00BD8CBA /* NetworkExtension.framework */; };
-		E0AB5CD32F3CCD9C00BD8CBA /* SwiftierNE.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E0AB5CD32F3CCD9C00BD8CBA /* SpotierNE.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E0AB5CC92F3CCD9C00BD8CBA /* SpotierNE.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E0AC7EEE2F19307C00FC425C /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */; };
 /* End PBXBuildFile section */
 
@@ -39,7 +39,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				E0AB5CD32F3CCD9C00BD8CBA /* SwiftierNE.appex in Embed Foundation Extensions */,
+				E0AB5CD32F3CCD9C00BD8CBA /* SpotierNE.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -56,44 +56,44 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		E0933DCC2F16A25B00C7DE59 /* Swiftier.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swiftier.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwiftierNE.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0933DCC2F16A25B00C7DE59 /* Spotier.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Spotier.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0AB5CC92F3CCD9C00BD8CBA /* SpotierNE.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SpotierNE.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E0AB5CCA2F3CCD9C00BD8CBA /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		E0AC7EED2F19307C00FC425C /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		E0AB5CD72F3CCD9C00BD8CBA /* Exceptions for "SwiftierNE" folder in "SwiftierNE" target */ = {
+		E07149802F434B500067FC17 /* Exceptions for "Spotier" folder in "Spotier" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */;
+			target = E0933DCB2F16A25B00C7DE59 /* Spotier */;
 		};
-		E0DA09B32F17A75300C54228 /* Exceptions for "Swiftier" folder in "Swiftier" target */ = {
+		E07149812F434B590067FC17 /* Exceptions for "SpotierNE" folder in "SpotierNE" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = E0933DCB2F16A25B00C7DE59 /* Swiftier */;
+			target = E0AB5CC82F3CCD9C00BD8CBA /* SpotierNE */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		E0933DCE2F16A25B00C7DE59 /* Swiftier */ = {
+		E0933DCE2F16A25B00C7DE59 /* Spotier */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				E0DA09B32F17A75300C54228 /* Exceptions for "Swiftier" folder in "Swiftier" target */,
+				E07149802F434B500067FC17 /* Exceptions for "Spotier" folder in "Spotier" target */,
 			);
-			path = Swiftier;
+			path = Spotier;
 			sourceTree = "<group>";
 		};
-		E0AB5CCC2F3CCD9C00BD8CBA /* SwiftierNE */ = {
+		E0AB5CCC2F3CCD9C00BD8CBA /* SpotierNE */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				E0AB5CD72F3CCD9C00BD8CBA /* Exceptions for "SwiftierNE" folder in "SwiftierNE" target */,
+				E07149812F434B590067FC17 /* Exceptions for "SpotierNE" folder in "SpotierNE" target */,
 			);
-			path = SwiftierNE;
+			path = SpotierNE;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -121,8 +121,8 @@
 		E0933DC32F16A25B00C7DE59 = {
 			isa = PBXGroup;
 			children = (
-				E0933DCE2F16A25B00C7DE59 /* Swiftier */,
-				E0AB5CCC2F3CCD9C00BD8CBA /* SwiftierNE */,
+				E0933DCE2F16A25B00C7DE59 /* Spotier */,
+				E0AB5CCC2F3CCD9C00BD8CBA /* SpotierNE */,
 				E0AC7EEC2F19307C00FC425C /* Frameworks */,
 				E0933DCD2F16A25B00C7DE59 /* Products */,
 			);
@@ -131,8 +131,8 @@
 		E0933DCD2F16A25B00C7DE59 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E0933DCC2F16A25B00C7DE59 /* Swiftier.app */,
-				E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */,
+				E0933DCC2F16A25B00C7DE59 /* Spotier.app */,
+				E0AB5CC92F3CCD9C00BD8CBA /* SpotierNE.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -149,9 +149,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E0933DCB2F16A25B00C7DE59 /* Swiftier */ = {
+		E0933DCB2F16A25B00C7DE59 /* Spotier */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E0933DED2F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "Swiftier" */;
+			buildConfigurationList = E0933DED2F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "Spotier" */;
 			buildPhases = (
 				E0933DC82F16A25B00C7DE59 /* Sources */,
 				E0933DC92F16A25B00C7DE59 /* Frameworks */,
@@ -166,18 +166,18 @@
 				E0AB5CD22F3CCD9C00BD8CBA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E0933DCE2F16A25B00C7DE59 /* Swiftier */,
+				E0933DCE2F16A25B00C7DE59 /* Spotier */,
 			);
-			name = Swiftier;
+			name = Spotier;
 			packageProductDependencies = (
 			);
-			productName = Swiftier;
-			productReference = E0933DCC2F16A25B00C7DE59 /* Swiftier.app */;
+			productName = Spotier;
+			productReference = E0933DCC2F16A25B00C7DE59 /* Spotier.app */;
 			productType = "com.apple.product-type.application";
 		};
-		E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */ = {
+		E0AB5CC82F3CCD9C00BD8CBA /* SpotierNE */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E0AB5CD42F3CCD9C00BD8CBA /* Build configuration list for PBXNativeTarget "SwiftierNE" */;
+			buildConfigurationList = E0AB5CD42F3CCD9C00BD8CBA /* Build configuration list for PBXNativeTarget "SpotierNE" */;
 			buildPhases = (
 				E0AB5CC52F3CCD9C00BD8CBA /* Sources */,
 				E0AB5CC62F3CCD9C00BD8CBA /* Frameworks */,
@@ -188,13 +188,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				E0AB5CCC2F3CCD9C00BD8CBA /* SwiftierNE */,
+				E0AB5CCC2F3CCD9C00BD8CBA /* SpotierNE */,
 			);
-			name = SwiftierNE;
+			name = SpotierNE;
 			packageProductDependencies = (
 			);
-			productName = SwiftierNE;
-			productReference = E0AB5CC92F3CCD9C00BD8CBA /* SwiftierNE.appex */;
+			productName = SpotierNE;
+			productReference = E0AB5CC92F3CCD9C00BD8CBA /* SpotierNE.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -237,7 +237,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E0933DC72F16A25B00C7DE59 /* Build configuration list for PBXProject "Swiftier" */;
+			buildConfigurationList = E0933DC72F16A25B00C7DE59 /* Build configuration list for PBXProject "Spotier" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -251,8 +251,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E0933DCB2F16A25B00C7DE59 /* Swiftier */,
-				E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */,
+				E0933DCB2F16A25B00C7DE59 /* Spotier */,
+				E0AB5CC82F3CCD9C00BD8CBA /* SpotierNE */,
 			);
 		};
 /* End PBXProject section */
@@ -294,7 +294,7 @@
 /* Begin PBXTargetDependency section */
 		E0AB5CD22F3CCD9C00BD8CBA /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = E0AB5CC82F3CCD9C00BD8CBA /* SwiftierNE */;
+			target = E0AB5CC82F3CCD9C00BD8CBA /* SpotierNE */;
 			targetProxy = E0AB5CD12F3CCD9C00BD8CBA /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -427,15 +427,15 @@
 		E0933DEE2F16A26200C7DE59 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = Swiftier;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Spotier;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Swiftier/Swiftier.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Spotier/Spotier.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_APP_SANDBOX = YES;
@@ -458,8 +458,8 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Swiftier/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Swiftier;
+				INFOPLIST_FILE = Spotier/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Spotier;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -471,7 +471,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = "";
-				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.spotier;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -493,15 +493,15 @@
 		E0933DEF2F16A26200C7DE59 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = Swiftier;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Spotier;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Swiftier/Swiftier.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Spotier/Spotier.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_APP_SANDBOX = YES;
@@ -524,8 +524,8 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Swiftier/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Swiftier;
+				INFOPLIST_FILE = Spotier/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Spotier;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -537,7 +537,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = "";
-				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.spotier;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -559,10 +559,10 @@
 		E0AB5CD52F3CCD9C00BD8CBA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = SwiftierNE/SwiftierNE.entitlements;
+				CODE_SIGN_ENTITLEMENTS = SpotierNE/SpotierNE.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
@@ -583,8 +583,8 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/include/**";
-				INFOPLIST_FILE = SwiftierNE/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SwiftierNE;
+				INFOPLIST_FILE = SpotierNE/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SpotierNE;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -593,7 +593,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/target/release";
 				MARKETING_VERSION = 1.0.0;
-				"OBJC_BRIDGING_HEADER[sdk=macosx*]" = "SwiftierNE/SwiftierNE-Bridging-Header.h";
+				"OBJC_BRIDGING_HEADER[sdk=macosx*]" = "SpotierNE/SpotierNE-Bridging-Header.h";
 				OTHER_LDFLAGS = (
 					"-leasytier_ios",
 					"-lc++",
@@ -605,7 +605,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.SwiftierNE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.spotier.SpotierNE;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -613,7 +613,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "SwiftierNE/SwiftierNE-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "SpotierNE/SpotierNE-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -622,10 +622,10 @@
 		E0AB5CD62F3CCD9C00BD8CBA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = SwiftierNE/SwiftierNE.entitlements;
+				CODE_SIGN_ENTITLEMENTS = SpotierNE/SpotierNE.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
@@ -646,8 +646,8 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EasyTierCore/include/**";
-				INFOPLIST_FILE = SwiftierNE/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SwiftierNE;
+				INFOPLIST_FILE = SpotierNE/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SpotierNE;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -667,7 +667,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.alick.swiftier.SwiftierNE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.spotier.SpotierNE;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -675,7 +675,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "SwiftierNE/SwiftierNE-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "SpotierNE/SpotierNE-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -684,7 +684,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E0933DC72F16A25B00C7DE59 /* Build configuration list for PBXProject "Swiftier" */ = {
+		E0933DC72F16A25B00C7DE59 /* Build configuration list for PBXProject "Spotier" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E0933DEB2F16A26200C7DE59 /* Debug */,
@@ -693,7 +693,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E0933DED2F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "Swiftier" */ = {
+		E0933DED2F16A26200C7DE59 /* Build configuration list for PBXNativeTarget "Spotier" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E0933DEE2F16A26200C7DE59 /* Debug */,
@@ -702,7 +702,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E0AB5CD42F3CCD9C00BD8CBA /* Build configuration list for PBXNativeTarget "SwiftierNE" */ = {
+		E0AB5CD42F3CCD9C00BD8CBA /* Build configuration list for PBXNativeTarget "SpotierNE" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E0AB5CD52F3CCD9C00BD8CBA /* Debug */,

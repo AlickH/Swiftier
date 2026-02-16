@@ -38,7 +38,7 @@ class ConfigManager: ObservableObject {
         
         // 3. 自动探测 iCloud 路径作为默认值
         if let drive = iCloudDriveURL {
-            let targetDir = drive.appendingPathComponent("Swiftier")
+            let targetDir = drive
             if !FileManager.default.fileExists(atPath: targetDir.path) {
                 try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
             }
@@ -47,7 +47,7 @@ class ConfigManager: ObservableObject {
         
         // 4. Fallback to local Application Support
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-             let targetDir = appSupport.appendingPathComponent("Swiftier")
+             let targetDir = appSupport.appendingPathComponent("Spotier")
              if !FileManager.default.fileExists(atPath: targetDir.path) {
                  try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
              }
@@ -75,7 +75,7 @@ class ConfigManager: ObservableObject {
         // 首次运行或未设置路径时，自动尝试初始化 iCloud
         if customPathString.isEmpty {
             if let drive = iCloudDriveURL {
-                let targetDir = drive.appendingPathComponent("Swiftier")
+                let targetDir = drive
                 if !FileManager.default.fileExists(atPath: targetDir.path) {
                     try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
                 }
@@ -84,7 +84,7 @@ class ConfigManager: ObservableObject {
             } else {
                 // Fallback to local Application Support
                 if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-                    let targetDir = appSupport.appendingPathComponent("Swiftier")
+                    let targetDir = appSupport.appendingPathComponent("Spotier")
                     if !FileManager.default.fileExists(atPath: targetDir.path) {
                         try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
                     }
@@ -128,7 +128,7 @@ class ConfigManager: ObservableObject {
         
         // Fallback: iCloud 容器路径
         if targetURL == nil, let drive = iCloudDriveURL {
-            targetURL = drive.appendingPathComponent("Swiftier")
+            targetURL = drive
         }
         
         // 最终 fallback
@@ -168,15 +168,39 @@ class ConfigManager: ObservableObject {
             return
         }
         
-        let targetDir = drive.appendingPathComponent("Swiftier")
+        let targetDir = drive
         let oldDir = drive.appendingPathComponent("EasyTier")
         
         do {
-            // 0. 自动迁移旧 EasyTier 文件夹（如果存在且新 Swiftier 不存在）
-            if FileManager.default.fileExists(atPath: oldDir.path) && 
-               !FileManager.default.fileExists(atPath: targetDir.path) {
-                try FileManager.default.moveItem(at: oldDir, to: targetDir)
-                print("已将旧 EasyTier 文件夹迁移到 Swiftier")
+            // 0a. 自动迁移旧 EasyTier 文件夹内容
+            if FileManager.default.fileExists(atPath: oldDir.path) {
+                let oldItems = try? FileManager.default.contentsOfDirectory(at: oldDir, includingPropertiesForKeys: nil)
+                if let oldItems = oldItems {
+                    for item in oldItems {
+                        let dest = targetDir.appendingPathComponent(item.lastPathComponent)
+                        if !FileManager.default.fileExists(atPath: dest.path) {
+                            try FileManager.default.moveItem(at: item, to: dest)
+                        }
+                    }
+                    try? FileManager.default.removeItem(at: oldDir)
+                    print("已迁移 EasyTier 内容到跟目录")
+                }
+            }
+
+            // 0b. 自动迁移错误的 nested Spotier 文件夹 (修复之前的 Bug)
+            let nestedSpotierDir = drive.appendingPathComponent("Spotier")
+            if FileManager.default.fileExists(atPath: nestedSpotierDir.path) {
+                 let nestedItems = try? FileManager.default.contentsOfDirectory(at: nestedSpotierDir, includingPropertiesForKeys: nil)
+                 if let nestedItems = nestedItems {
+                     for item in nestedItems {
+                         let dest = targetDir.appendingPathComponent(item.lastPathComponent)
+                         if !FileManager.default.fileExists(atPath: dest.path) {
+                             try FileManager.default.moveItem(at: item, to: dest)
+                         }
+                     }
+                     try? FileManager.default.removeItem(at: nestedSpotierDir)
+                     print("已修复嵌套的 Spotier 文件夹")
+                 }
             }
             
             // 1. 创建目标目录

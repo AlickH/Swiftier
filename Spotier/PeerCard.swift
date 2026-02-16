@@ -309,7 +309,7 @@ struct PeerDetailView: View {
     }
     
     @ViewBuilder
-    private func localNodeSections(_ node: SwiftierStatus.NodeInfo) -> some View {
+    private func localNodeSections(_ node: SpotierStatus.NodeInfo) -> some View {
         Section(header: Text(LocalizedStringKey("节点"))) {
             DetailRow(label: LocalizedStringKey("主机名"), value: node.hostname)
             DetailRow(label: LocalizedStringKey("版本"), value: node.version)
@@ -328,7 +328,7 @@ struct PeerDetailView: View {
     }
     
     @ViewBuilder
-    private func remotePeerSections(_ pair: SwiftierStatus.PeerRoutePair) -> some View {
+    private func remotePeerSections(_ pair: SpotierStatus.PeerRoutePair) -> some View {
         let route = pair.route
         
         Section(header: Text(LocalizedStringKey("节点"))) {
@@ -389,7 +389,7 @@ struct PeerDetailView: View {
         }
     }
     
-    private func formatFlags(_ flags: SwiftierStatus.PeerFeatureFlag) -> String {
+    private func formatFlags(_ flags: SpotierStatus.PeerFeatureFlag) -> String {
         var parts = [String]()
         if flags.isPublicServer { parts.append("public_server") }
         if flags.avoidRelayData { parts.append("avoid_relay") }

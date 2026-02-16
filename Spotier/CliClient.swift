@@ -29,9 +29,9 @@ struct PeerInfo: Identifiable, Equatable {
     // Add more as needed based on observation
     
     // 针对远程节点的完整数据信息
-    var fullData: SwiftierStatus.PeerRoutePair? = nil
+    var fullData: SpotierStatus.PeerRoutePair? = nil
     // 针对“本机”节点的完整信息
-    var myNodeData: SwiftierStatus.NodeInfo? = nil
+    var myNodeData: SpotierStatus.NodeInfo? = nil
     
     // 运行中必须保证稳定且唯一的 id：否则 SwiftUI 会把同一节点当成“删除+新增”，或出现跳格/错位
     // 优先使用 route.peerId（数值通常最稳定、且唯一），再降级到 instId / nodeId，最后兜底 hostname+ipv4。

@@ -2,8 +2,8 @@ import NetworkExtension
 import os
 
 public let APP_BUNDLE_ID: String = "com.alick.swiftier"
-public let APP_GROUP_ID: String = "group.com.alick.swiftier"
-public let ICLOUD_CONTAINER_ID: String = "iCloud.com.alick.swiftier"
+public let APP_GROUP_ID: String = "group.com.alick.spotier"
+public let ICLOUD_CONTAINER_ID: String = "iCloud.com.alick.spotier"
 public let LOG_FILENAME: String = "easytier.log"
 
 public enum LogLevel: String, Codable, CaseIterable {

@@ -1,5 +1,5 @@
 //
-//  SwiftierRunner.swift
+//  SpotierRunner.swift
 //  Swiftier
 //
 //  Created by Alick on 2024.
@@ -11,8 +11,8 @@ import AppKit
 import SwiftUI
 import NetworkExtension
 
-final class SwiftierRunner: ObservableObject {
-    static let shared = SwiftierRunner()
+final class SpotierRunner: ObservableObject {
+    static let shared = SpotierRunner()
 
     @Published var isRunning = false
     @Published var peers: [PeerInfo] = []
@@ -217,7 +217,7 @@ final class SwiftierRunner: ObservableObject {
     func openLogFile() {
         // Logs for NE are different. They might be in the Console.app or a shared file.
         // If we implement file logging in PacketTunnelProvider to a shared container:
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alick.swiftier") {
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alick.spotier") {
             let logURL = containerURL.appendingPathComponent("easytier.log")
             if FileManager.default.fileExists(atPath: logURL.path) {
                 NSWorkspace.shared.open(logURL)
@@ -278,7 +278,7 @@ final class SwiftierRunner: ObservableObject {
         var totalTx = 0
         var fetchedPeers: [PeerInfo] = []
         
-            guard let status = try? jsonDecoder.decode(SwiftierStatus.self, from: data) else { return }
+            guard let status = try? jsonDecoder.decode(SpotierStatus.self, from: data) else { return }
             
             // 1. IP & Events
             LogParser.shared.updateEventsFromRunningInfo(status.events)

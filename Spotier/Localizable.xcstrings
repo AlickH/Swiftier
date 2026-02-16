@@ -72,6 +72,12 @@
     "easytier" : {
 
     },
+    "EasyTier" : {
+
+    },
+    "easytier.cn" : {
+
+    },
     "ERROR" : {
 
     },
@@ -161,24 +167,24 @@
         }
       }
     },
-    "Swiftier 已是最新版本" : {
+    "Spotier 已是最新版本" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Swiftier is up to date"
+            "value" : "Spotier is up to date"
           }
         }
       }
     },
-    "Swiftier 应该已自动出现在列表中" : {
+    "Spotier 应该已自动出现在列表中" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "2. Swiftier should be in the list"
+            "value" : "2. Spotier should be in the list"
           }
         }
       }
@@ -322,13 +328,13 @@
         }
       }
     },
-    "为了能够读取您选择的任意文件夹及配置文件，Swiftier 需要“完全磁盘访问权限”。\n这不会泄露您的私有数据，仅用于解除系统文件夹读取限制。" : {
+    "为了能够读取您选择的任意文件夹及配置文件，Spotier 需要“完全磁盘访问权限”。\n这不会泄露您的私有数据，仅用于解除系统文件夹读取限制。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Swiftier needs Full Disk Access to read your config folders. Your private data is never accessed."
+            "value" : "Spotier needs Full Disk Access to read your config folders. Your private data is never accessed."
           }
         }
       }
@@ -410,7 +416,7 @@
         }
       }
     },
-    "仅使用物理网卡，避免 Swiftier 通过其他虚拟网建立连接。" : {
+    "仅使用物理网卡，避免 Spotier 通过其他虚拟网建立连接。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -420,6 +426,9 @@
           }
         }
       }
+    },
+    "仅使用物理网卡，避免 Swiftier 通过其他虚拟网建立连接。" : {
+
     },
     "仅保留 Helper 加速启动" : {
       "extractionState" : "manual",
@@ -927,7 +936,7 @@
         }
       }
     },
-    "启用魔法 DNS，允许通过 Swiftier 的 DNS 服务器访问其他节点的虚拟 IPv4 地址，例如：node1.et.net。" : {
+    "启用魔法 DNS，允许通过 Spotier 的 DNS 服务器访问其他节点的虚拟 IPv4 地址，例如：node1.et.net。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -937,6 +946,9 @@
           }
         }
       }
+    },
+    "启用魔法 DNS，允许通过 Swiftier 的 DNS 服务器访问其他节点的虚拟 IPv4 地址，例如：node1.et.net。" : {
+
     },
     "在 Finder 中打开" : {
       "extractionState" : "manual",
@@ -1224,16 +1236,19 @@
         }
       }
     },
-    "开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 Swiftier 网络。" : {
+    "开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 Spotier 网络。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enable SOCKS5 proxy so external apps like Surge can connect to the Swiftier network."
+            "value" : "Enable SOCKS5 proxy so external apps like Surge can connect to the Spotier network."
           }
         }
       }
+    },
+    "开启 SOCKS5 代理功能，Surge 等外部程序可通过此端口连接 Swiftier 网络。" : {
+
     },
     "开放" : {
       "extractionState" : "manual",
@@ -1301,7 +1316,6 @@
         }
       }
     },
-
     "手动指定监听器的公网地址，其他节点可以使用该地址连接到本节点。例如：tcp://123.123.123.123:11223，可以指定多个。" : {
       "extractionState" : "manual",
       "localizations" : {

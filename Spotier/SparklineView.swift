@@ -47,7 +47,7 @@ struct SparklineView: NSViewRepresentable {
         }
         deinit {
             // Safety cleanup just in case
-            // DispatchQueue.main.async { SwiftierRunner.shared.removeSubscriber() }
+            // DispatchQueue.main.async { SpotierRunner.shared.removeSubscriber() }
         }
     }
 }
@@ -70,8 +70,8 @@ struct SmartSparklineView: View {
     
     var body: some View {
         SparklineView(data: data, color: color, maxScale: maxScale, paused: paused)
-            .onAppear { SwiftierRunner.shared.addSubscriber() }
-            .onDisappear { SwiftierRunner.shared.removeSubscriber() }
+            .onAppear { SpotierRunner.shared.addSubscriber() }
+            .onDisappear { SpotierRunner.shared.removeSubscriber() }
     }
 }
 
@@ -341,7 +341,7 @@ final class SparklineNSView: NSView {
         let isFirstRealUpdate = (prevLastValue == nil) && !isLayoutPass
         
         if isFirstRealUpdate {
-            let lastTime = SwiftierRunner.shared.lastDataTime
+            let lastTime = SpotierRunner.shared.lastDataTime
             let now = Date()
             let elapsed = now.timeIntervalSince(lastTime)
             if elapsed >= 0 && elapsed < animationDuration {

@@ -76,7 +76,14 @@ struct SettingsView: View {
                     HStack {
                         Text("源代码")
                         Spacer()
-                        Link("GitHub 仓库", destination: URL(string: "https://github.com/AlickH/Swiftier")!)
+                        Link("GitHub 仓库", destination: URL(string: "https://github.com/AlickH/Spotier")!)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    HStack {
+                        Text("EasyTier")
+                        Spacer()
+                        Link("easytier.cn", destination: URL(string: "https://easytier.cn/")!)
                             .foregroundColor(.blue)
                     }
                     

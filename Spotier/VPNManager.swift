@@ -76,12 +76,12 @@ class VPNManager: ObservableObject {
         print("VPNManager: Starting setupVPNProfile...")
         
         let manager = NETunnelProviderManager()
-        manager.localizedDescription = "Swiftier VPN"
+        manager.localizedDescription = "Spotier VPN"
         
         let protocolConfiguration = NETunnelProviderProtocol()
-        let extensionBundleID = "com.alick.swiftier.SwiftierNE"
+        let extensionBundleID = "com.alick.spotier.SpotierNE"
         protocolConfiguration.providerBundleIdentifier = extensionBundleID
-        protocolConfiguration.serverAddress = "Swiftier"
+        protocolConfiguration.serverAddress = "Spotier"
         
         manager.protocolConfiguration = protocolConfiguration
         manager.isEnabled = true
@@ -163,7 +163,7 @@ class VPNManager: ObservableObject {
     }
     
     func saveConfigToAppGroup(configContent: String) -> URL? {
-        guard let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alick.swiftier") else {
+        guard let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: APP_GROUP_ID) else {
             print("Failed to get App Group container")
             return nil
         }

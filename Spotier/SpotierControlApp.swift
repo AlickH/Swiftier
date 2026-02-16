@@ -4,9 +4,9 @@ import Combine
 import NetworkExtension
 
 @main
-struct SwiftierControlApp: App {
+struct SpotierControlApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var runner = SwiftierRunner.shared
+    @StateObject private var runner = SpotierRunner.shared
     @StateObject private var iconState = MenuBarIconState.shared
     @AppStorage("breathEffect") private var breathEffect: Bool = true
     
@@ -45,7 +45,7 @@ class MenuBarIconState: ObservableObject {
     
     private init() {
         // 优化：监听运行状态变化，按需启停 Timer
-        SwiftierRunner.shared.$isRunning
+        SpotierRunner.shared.$isRunning
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isRunning in
                 self?.handleRunningStateChange(isRunning: isRunning)
@@ -67,7 +67,7 @@ class MenuBarIconState: ObservableObject {
     }
     
     private func updateTimerState() {
-        let isRunning = SwiftierRunner.shared.isRunning
+        let isRunning = SpotierRunner.shared.isRunning
         let blinkEnabled = (UserDefaults.standard.object(forKey: "breathEffect") as? Bool) ?? true
         
         if isRunning && blinkEnabled {
@@ -141,7 +141,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("[Launch] VPN status: \(vpn.status.rawValue), isConnected: \(vpn.isConnected), onDemand: \(vpn.isOnDemandEnabled)")
         
         // 同步 Runner 的 UI 状态
-        SwiftierRunner.shared.syncWithVPNState()
+        SpotierRunner.shared.syncWithVPNState()
         
         // 如果 NE 已经在运行，不做任何操作，避免 saveToPreferences 导致隧道重启
         if vpn.isConnected || vpn.status == .connecting {
@@ -159,7 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let configs = ConfigManager.shared.refreshConfigs()
             if let config = configs.first {
                 print("[Launch] Triggering initial connect with: \(config.lastPathComponent)")
-                SwiftierRunner.shared.toggleService(configPath: config.path)
+                SpotierRunner.shared.toggleService(configPath: config.path)
             }
         }
     }
