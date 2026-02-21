@@ -1,11 +1,11 @@
 # Spotier (EasyTier for macOS)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/AlickH/Spotier/main/Spotier.png" width="128" height="128" alt="Spotier Icon">
+  <img src="https://raw.githubusercontent.com/AlickH/Swiftier/refs/heads/network-extension/Swiftier.png" width="128" height="128" alt="Spotier Icon">
 </p>
 <p align="center">
-  <img src="https://github.com/AlickH/Spotier/blob/main/Light.png?raw=true" width="300">
-  <img src="https://github.com/AlickH/Spotier/blob/main/Dark.png?raw=true" width="300">
+  <img src="https://raw.githubusercontent.com/AlickH/Swiftier/refs/heads/network-extension/Light.png" width="300">
+  <img src="https://raw.githubusercontent.com/AlickH/Swiftier/refs/heads/network-extension/Dark.png" width="300">
 </p>
 
 [中文说明](#简介) | [English](#introduction) | [TestFlight Beta](https://testflight.apple.com/join/TDsVHaTx)
