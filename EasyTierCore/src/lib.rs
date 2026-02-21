@@ -16,6 +16,7 @@ static INSTANCE: Lazy<Arc<Mutex<Option<NetworkInstance>>>> = Lazy::new(|| Arc::n
 pub extern "C" fn init_logger(
     path: *const std::ffi::c_char,
     level: *const std::ffi::c_char,
+    subsystem: *const std::ffi::c_char,
     err_msg: *mut *const std::ffi::c_char,
 ) -> std::ffi::c_int {
     let path = unsafe {
@@ -28,18 +29,18 @@ pub extern "C" fn init_logger(
             .to_string_lossy()
             .into_owned()
     };
+    let subsystem = unsafe {
+        std::ffi::CStr::from_ptr(subsystem)
+            .to_string_lossy()
+            .into_owned()
+    };
 
     let impl_func = || {
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(true)
-            .open(path)
-            .map_err(|e| e.to_string())?;
+        let file = File::create(path).map_err(|e| e.to_string())?;
         let collector = tracing_subscriber::registry()
             .with(tracing_subscriber::EnvFilter::new(level))
             .with(tracing_subscriber::fmt::layer().with_writer(file).with_ansi(false))
-            .with(OsLogger::new("site.yinmo.easytier.tunnel", "rust"));
+            .with(OsLogger::new(&subsystem, "rust"));
         tracing::subscriber::set_global_default(collector).map_err(|e| e.to_string())
     };
 
